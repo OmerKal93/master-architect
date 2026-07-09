@@ -1,8 +1,41 @@
-# Agent Reliability Toolkit — Complete Ordered PR Plan
+# Agent Reliability Toolkit — Architectural PR Catalog
 
 Companion to [`PLAN.md`](PLAN.md) §31. **95 PRs (PR-001 … PR-095)** across Milestones A–N.
-Ordering is the merge order; a PR may start earlier if its `Depends on` PRs are merged.
-Release-boundary PRs are marked **⛳ RELEASE**.
+
+**What this document is:** the complete architectural decomposition of the system — proof that
+every component in the Master Architecture Roadmap has been thought through to reviewable-PR
+granularity, in *architectural dependency order*, as a reference implementation decomposition.
+
+**What this document is not:** the committed merge order. **[`EXECUTION.md`](EXECUTION.md)
+controls the active implementation sequence** (the first execution wave, E01–E14, and the
+releases v0.1.0 → v0.5.x). Later catalog PRs are **subject to gate-driven resequencing**: after
+validation (PLAN.md §37), they may be reordered, merged, split, or deferred. A PR may start
+earlier than its catalog position if its `Depends on` PRs are merged. Release-boundary PRs are
+marked **⛳ RELEASE** (architecture-era version numbers; committed-wave versions live in
+`EXECUTION.md`).
+
+## Mapping: committed execution wave → catalog coverage
+
+| E-PR (EXECUTION.md) | Architectural catalog coverage |
+|---|---|
+| E01 — Minimal OSS bootstrap | selected parts of PR-001, PR-002 |
+| E02 — Contracts + finding model + micro-IR | minimal subset of PR-005, PR-007 |
+| E03 — Safe Python frontend | selected parts of PR-008 |
+| E04 — CLI + AR001 → v0.1.0 | PR-009 |
+| E05 — AR003 + AR014 | PR-012 |
+| E06 — JSON + SARIF + schemas | PR-013 |
+| E07 — Explain/docs/suppressions → v0.2.0 | selected parts of PR-015, PR-021 |
+| E08 — LangGraph recognition | selected parts of PR-025, PR-026, PR-027 (lowering only) |
+| E09 — Minimal classifier + LG rules → v0.3.0 | selected parts of PR-016 (subset), PR-027, PR-028 |
+| E10 — Malicious-repo + offline hardening | selected parts of PR-006 (redaction subset), PR-010 (guard half), PR-022 |
+| E11 — GitHub Action | selected parts of PR-033, PR-034 (reduced), PR-035 |
+| E12 — Public launch → v0.4.0 | selected parts of PR-004 (docs scaffold), PR-023 (examples), community docs |
+| E13 — Adoption features + AR002/AR011 → v0.5.x | selected parts of PR-014, PR-015 (completion), PR-016 (expansion), PR-017, PR-032 |
+| E14 — Evidence review + next-wave decision | no code equivalent — gate review (PLAN.md §37) |
+
+Catalog PRs *partially* covered by the wave (e.g. PR-016's full classification engine, PR-022's
+multiprocessing performance work, PR-024's plugin loading) retain their remaining scope here and
+proceed per their milestone's gate status.
 
 Every PR entry carries the 25 fields required by the specification (§11.1), in this fixed layout:
 
@@ -21,6 +54,8 @@ rollback = `git revert` unless stated otherwise (all schema changes below state 
 ---
 
 ## Milestone A — Repository and governance foundation
+
+> **Status: Committed via the execution wave.** `EXECUTION.md` (E01–E14) resequences and narrows this milestone; the entries below are the full architecture-era decomposition and the reference design for the remaining scope. Full governance artifacts are behind the governance-expansion gate (PLAN.md §37).
 
 ### PR-001 — Repository bootstrap: license, governance, and community docs
 *Area: repo/governance · Complexity: S · Contributor-friendly: no · Artifact: none*
@@ -125,6 +160,8 @@ rollback = `git revert` unless stated otherwise (all schema changes below state 
 ---
 
 ## Milestone B — Core domain and CLI walking skeleton → ⛳ v0.1.0
+
+> **Status: Committed via the execution wave.** `EXECUTION.md` (E01–E14) resequences and narrows this milestone; the entries below are the full architecture-era decomposition and the reference design for the remaining scope. The Egress Broker object (PR-010) is deferred to the model-advisor gate; the no-network socket guard stands in (EXECUTION.md E10).
 
 ### PR-005 — agent-core domain model and finding schema
 *Area: agent-core · Complexity: L · Contributor-friendly: no · Artifact: agent-reliability-core (at PR-011)*
@@ -321,6 +358,8 @@ rollback = `git revert` unless stated otherwise (all schema changes below state 
 ---
 
 ## Milestone C — Static analyzer MVP → ⛳ v0.2.0
+
+> **Status: Committed via the execution wave.** `EXECUTION.md` (E01–E14) resequences and narrows this milestone; the entries below are the full architecture-era decomposition and the reference design for the remaining scope. The wave ships 7 of these rules (AR001/002/003/011/014 + LG set) plus SARIF, suppressions, baselines, and hardening; remaining rule depth is decided at the E14 evidence review.
 
 ### PR-012 — Rules AR014 (unbounded retry) and AR003 (missing timeout)
 *Area: agent-lint rules · Complexity: M · Contributor-friendly: yes · Artifact: (with v0.2.0)*
@@ -610,7 +649,11 @@ rollback = `git revert` unless stated otherwise (all schema changes below state 
 
 ## Milestone D — LangGraph plugin → ⛳ v0.3.0
 
+> **Status: Committed via the execution wave.** `EXECUTION.md` (E01–E14) resequences and narrows this milestone; the entries below are the full architecture-era decomposition and the reference design for the remaining scope. The wave ships recognition + LG002/LG003/LG006 as internal modules; **plugin entry-point loading (PR-024) and the separate plugin distribution are gated** (plugin-loading gate, PLAN.md §37); remaining LG rules follow validation.
+
 ### PR-024 — Plugin loading, compatibility handshake, and isolation
+> **Gated:** requires the plugin-loading gate (PLAN.md §37) — a proposed third-party adapter that must ship outside the main distribution, after the Frontend/Rule contracts survive ≥2 public releases.
+
 *Area: agent-core plugins · Complexity: M · Contributor-friendly: no · Artifact: (with v0.3.0)*
 - **Value:** Third-party and first-party plugins load safely and predictably.
 - **Scope:** Entry-point discovery (`agent_reliability.plugins` group), explicit-enable config
@@ -790,6 +833,8 @@ rollback = `git revert` unless stated otherwise (all schema changes below state 
 
 ## Milestone E — CI integration → ⛳ v0.4.0
 
+> **Status: Committed via the execution wave.** `EXECUTION.md` (E01–E14) resequences and narrows this milestone; the entries below are the full architecture-era decomposition and the reference design for the remaining scope. The wave ships the minimal Action (path/format/fail-on) in E11; baseline/changed-files inputs arrive with E13.
+
 ### PR-032 — Changed-files mode and monorepo scoping
 *Area: agent-lint · Complexity: M · Contributor-friendly: no · Artifact: (with v0.4.0)*
 - **Value:** PR-sized scans in seconds, honestly scoped.
@@ -900,6 +945,8 @@ rollback = `git revert` unless stated otherwise (all schema changes below state 
 
 ## Milestone F — ReplaySafe MVP (SQLite) → ⛳ v0.5.0
 
+> **Status: Planned architecture — implementation requires the ReplaySafe validation gate defined in PLAN.md §37 and EXECUTION.md.** Not automatically committed; may be resequenced, split, or merged when the gate opens.
+
 ### PR-037 — replaysafe package: domain, state machine, SQLite ledger
 *Area: replaysafe · Complexity: L · Contributor-friendly: no · Artifact: replaysafe (at PR-045)*
 - **Value:** The ground truth for side-effect execution exists: a durable, tamper-evident ledger.
@@ -932,7 +979,7 @@ rollback = `git revert` unless stated otherwise (all schema changes below state 
 
 ### PR-038 — @action decorator, key derivation, and deduplication
 *Area: replaysafe · Complexity: L · Contributor-friendly: no · Artifact: (with v0.5.0)*
-- **Value:** The one-decorator promise: same key ⇒ the effect runs at most once.
+- **Value:** The one-decorator promise, stated precisely: same key ⇒ ReplaySafe deduplicates confirmed executions and blocks ambiguous re-execution by default (see PLAN.md §16 claim precision — end-to-end at-most-once additionally requires service-side idempotency, verification, an outbox, compensation, or human resolution).
 - **Scope:** `ReplaySafe` entry object; `@rs.action(key=…, effect=…)` and `rs.wrap(fn, …)`;
   key derivation/validation (namespacing `{action}:{key}`, size/charset rules, long-key hashing),
   `args_hash` computation (canonical JSON of bound arguments) + `KeyReuseError`; dedupe path
@@ -1054,7 +1101,8 @@ rollback = `git revert` unless stated otherwise (all schema changes below state 
 - **Security:** T16 stress evidence; §26.6/26.7 implemented.
 - **Privacy/egress:** none.
 - **Tests:** The harness's own meta-tests (kill points actually fire where scripted).
-- **Docs:** Testing-strategy page section (how we prove at-most-once).
+- **Docs:** Testing-strategy page section (how we prove deduplication and
+  no-ambiguous-re-execution under crash and concurrency).
 - **Acceptance criteria:** All four kill points leave the documented state (`uncertain` where
   designed); interleaving suite green 500× in CI loop mode.
 - **Release / Migration / Rollback:** gates v0.5.0 / none / revert-safe (but gates stay).
@@ -1134,6 +1182,8 @@ rollback = `git revert` unless stated otherwise (all schema changes below state 
 ---
 
 ## Milestone G — ReplaySafe production adapters → v0.5.x
+
+> **Status: Planned architecture — implementation requires the PostgreSQL/Redis validation gate defined in PLAN.md §37 and EXECUTION.md** (and Milestone F open). Not automatically committed.
 
 ### PR-046 — Ledger protocol extraction and backend parity suite
 *Area: replaysafe · Complexity: M · Contributor-friendly: no · Artifact: none (test infra)*
@@ -1298,10 +1348,13 @@ rollback = `git revert` unless stated otherwise (all schema changes below state 
 
 ## Milestone H — Agent Chaos MVP → ⛳ v0.6.0
 
+> **Status: Planned architecture — implementation requires the Agent Chaos validation gate defined in PLAN.md §37 and EXECUTION.md.** Not automatically committed. Isolation claims follow the staged model in PLAN.md §17 (application-level guard = best-effort; strong containment = OS-level isolation).
+
 ### PR-053 — Scenario schema, loader, determinism core, and simulation boundary
 *Area: agent-chaos · Complexity: L · Contributor-friendly: no · Artifact: agent-chaos (at PR-060)*
-- **Value:** The chaos foundation: reproducible scenarios that physically cannot touch
-  production.
+- **Value:** The chaos foundation: reproducible scenarios with an enforced, honestly-staged
+  isolation boundary (application-level guard = best-effort containment; OS-level isolation =
+  the strong boundary — PLAN.md §17).
 - **Scope:** New package `packages/agent-chaos/`; scenario YAML schema v1 (PLAN.md §17) +
   loader/validator; seeded RNG plumbing (single seed → all fault schedules); target loading
   (`kind: python|command` entrypoints — LangGraph convenience in PR-057); **simulation boundary**:
@@ -1499,6 +1552,8 @@ rollback = `git revert` unless stated otherwise (all schema changes below state 
 
 ## Milestone I — Agent Contract MVP → ⛳ v0.7.0
 
+> **Status: Planned architecture — implementation requires the Agent Contract validation gate defined in PLAN.md §37 and EXECUTION.md.** Not automatically committed.
+
 ### PR-061 — Contract format, schema, and parser
 *Area: agent-contract · Complexity: M · Contributor-friendly: no · Artifact: agent-contract (at PR-067)*
 - **Value:** A human-readable, machine-checkable contract language for tools.
@@ -1668,6 +1723,8 @@ rollback = `git revert` unless stated otherwise (all schema changes below state 
 
 ## Milestone J — VS Code integration → ⛳ v0.8.0
 
+> **Status: Planned architecture — implementation requires the VS Code validation gate defined in PLAN.md §37 and EXECUTION.md.** Not automatically committed.
+
 ### PR-068 — `agent-lint serve --lsp` language service
 *Area: agent-lint LSP · Complexity: L · Contributor-friendly: no · Artifact: (with v0.8.0)*
 - **Value:** Editor-grade latency for the same engine, with zero duplicated logic.
@@ -1785,6 +1842,8 @@ rollback = `git revert` unless stated otherwise (all schema changes below state 
 
 ## Milestone K — MCP reliability support → ⛳ v0.9.0
 
+> **Status: Planned architecture — implementation requires the MCP validation gate defined in PLAN.md §37 and EXECUTION.md.** Not automatically committed.
+
 ### PR-073 — MCP manifest frontend and permission-scope rules
 *Area: mcp plugin · Complexity: L · Contributor-friendly: no · Artifact: agent-reliability-mcp (at PR-077)*
 - **Value:** MCP tool surfaces become analyzable IR; AR008 gets real evidence.
@@ -1899,6 +1958,8 @@ rollback = `git revert` unless stated otherwise (all schema changes below state 
 
 ## Milestone L — n8n support → v0.9.x
 
+> **Status: Planned architecture — implementation requires the n8n validation gate defined in PLAN.md §37 and EXECUTION.md.** Not automatically committed.
+
 ### PR-078 — n8n workflow JSON frontend
 *Area: n8n plugin · Complexity: M · Contributor-friendly: no · Artifact: agent-reliability-n8n (at PR-083)*
 - **Value:** Exported n8n workflows become IR — no TypeScript required.
@@ -1968,7 +2029,8 @@ rollback = `git revert` unless stated otherwise (all schema changes below state 
 
 ### PR-081 — ReplaySafe node and circuit-breaker node + npm publish
 *Area: n8n nodes (TS) · Complexity: L · Contributor-friendly: no · Artifact: **npm package (published)***
-- **Value:** At-most-once semantics and failure isolation inside n8n workflows.
+- **Value:** Deduplicated execution (ambiguity blocked by default) and failure isolation
+  inside n8n workflows.
 - **Scope:** **ReplaySafe node** (claim/receipt around downstream execution; better-sqlite3
   local ledger, Postgres option for hosted n8n — schema-compatible with the Python ledger so
   `replaysafe` CLI can inspect it **[compat tested]**); **Circuit-breaker node**
@@ -2037,6 +2099,8 @@ rollback = `git revert` unless stated otherwise (all schema changes below state 
 ---
 
 ## Milestone M — Optional model advisor → v0.9.x
+
+> **Status: Planned architecture — optional forever; implementation requires the model-advisor validation gate defined in PLAN.md §37 and EXECUTION.md** (Egress Broker + preview/redaction/allowlist/approval prerequisites). **The advisor can never become a security or authorization authority.**
 
 ### PR-084 — Advisor package boundary and minimal-context extraction
 *Area: model-advisor · Complexity: M · Contributor-friendly: no · Artifact: agent-reliability-advisor (at PR-087)*
@@ -2144,6 +2208,8 @@ rollback = `git revert` unless stated otherwise (all schema changes below state 
 ---
 
 ## Milestone N — v1 hardening → ⛳ v1.0.0
+
+> **Status: Validation-only.** Hardening applies to whatever scope actually shipped through the gates; the entries below assume the full architecture and are narrowed accordingly at planning time.
 
 ### PR-088 — Threat-model re-verification and security-audit fixes (wave 1)
 *Area: security · Complexity: L · Contributor-friendly: no · Artifact: (with v1.0.0)*

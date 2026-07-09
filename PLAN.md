@@ -1,12 +1,41 @@
-# Agent Reliability Toolkit — Complete Implementation Plan
+# Agent Reliability Toolkit — Master Architecture Roadmap (Layer 1)
 
 **Status:** Planning phase — no production code exists yet.
-**Source specification:** [`docs/planning-prompt.md`](docs/planning-prompt.md)
-**Companion document:** [`PLAN-PRS.md`](PLAN-PRS.md) — the complete ordered PR plan (section 31).
+**Source specifications:** [`docs/planning-prompt.md`](docs/planning-prompt.md),
+[`docs/execution-revision-prompt.md`](docs/execution-revision-prompt.md)
+**Companion documents:** [`PLAN-PRS.md`](PLAN-PRS.md) — the architectural PR catalog (section
+31); [`EXECUTION.md`](EXECUTION.md) — the active Open-Source Execution Roadmap.
 
-This document is written so that a coding agent can implement the system PR by PR without
-redesigning it mid-flight. Where the specification left a choice open, the decision is made here,
-labeled, and justified. Assumptions are marked **[ASSUMPTION]**.
+This document is written so that a coding agent can implement the system without redesigning it
+mid-flight. Where the specification left a choice open, the decision is made here, labeled, and
+justified. Assumptions are marked **[ASSUMPTION]**.
+
+## Two planning layers
+
+The plan is split into two layers with different commitment levels:
+
+| Layer | Documents | What it commits |
+|---|---|---|
+| **Layer 1 — Master Architecture Roadmap** | `PLAN.md` (this document) + `PLAN-PRS.md` | The complete system vision through v1.0: every component, package boundary, trust boundary, schema, runtime semantic, and threat mitigation. Architecture, not merge order. |
+| **Layer 2 — Open-Source Execution Roadmap** | `EXECUTION.md` | The committed implementation sequence: the first execution wave (E01–E14), its releases (v0.1.0 → v0.5.x), and the validation gates that open later components. |
+
+**Precedence rules:**
+
+1. `EXECUTION.md` controls the active implementation sequence.
+2. `PLAN.md` controls architectural boundaries, security principles, product scope, and the v1.0
+   direction.
+3. `PLAN-PRS.md` is the detailed architectural catalog for later work — it proves the system has
+   been thought through end to end; it is **not** the committed merge order.
+4. If `EXECUTION.md` and `PLAN-PRS.md` differ in sequencing, `EXECUTION.md` wins.
+5. If execution pressure conflicts with a security or privacy invariant in this document, the
+   security/privacy invariant wins.
+6. Any exception to a validation gate (§37) or a major architecture boundary requires a
+   documented, public ADR.
+
+The guiding principle of the split: **build a serious core, release a narrow surface.** The
+architecture anticipates the complete system; implementation progresses through independently
+useful open-source releases, and later components open on real-world evidence, not roadmap
+momentum.
 
 ---
 
@@ -40,11 +69,15 @@ standalone or together:
 may explain, never authorize); scanned user code is never executed; SQLite before any database
 server; small public APIs; SARIF and JSON as stable output contracts.
 
-**Path to v1.0:** 14 milestones (A–N), **95 PRs** (see `PLAN-PRS.md`), 10 release checkpoints
-(v0.1.0 → v1.0.0). The first genuinely useful release is **v0.2.0**: `pip install agent-lint`,
-run `agent-lint scan .` on any Python agent codebase, get deterministic findings for unbounded
-loops, missing timeouts, and unbounded retries, with JSON/SARIF output and baselines — no
-account, no network, no model.
+**Path to v1.0:** the complete architecture remains planned through v1.0 — 14 milestones (A–N)
+decomposed into a **95-PR architectural catalog** (`PLAN-PRS.md`). **Only the first execution
+wave is commitment-level work** (`EXECUTION.md`, E01–E14): the first real finding ships at
+**v0.1.0** (CLI + AR001), the first genuinely useful standalone linter at **v0.2.0**
+(AR001/AR003/AR014 + JSON/SARIF + explain + suppressions), LangGraph-aware rules at **v0.3.0**,
+and the deliberate **public launch at v0.4.0** (hardened scanner + GitHub Action). Every later
+component — ReplaySafe, agent-chaos, agent-contract, MCP, n8n, VS Code, the model advisor — is
+fully designed here and proceeds through the validation gates in §37, or a documented gate
+override, never automatically.
 
 ---
 
@@ -660,6 +693,16 @@ AR011). Final list confirmed during Milestone D with fixtures from real LangGrap
 **Goal:** make agent actions safe under retry, resume, duplicate delivery, timeout, crash, and
 concurrency — as a library with a local ledger, no server.
 
+**Claim precision (normative for all ReplaySafe docs and marketing):** ReplaySafe
+**deduplicates confirmed executions and blocks ambiguous re-execution by default.** It is never
+described as guaranteeing that "the external effect ran at most once" — no client-side library
+can promise that unaided. True end-to-end protection depends on at least one of: service-side
+idempotency (e.g. a provider idempotency key), authoritative verification (a `verify` hook that
+can query the real outcome), a transactional outbox on the caller's side, a compensating action,
+or human resolution. ReplaySafe's contribution is that **uncertain execution is a first-class
+state** and there is **no silent retry after ambiguous success** — the ledger makes the ambiguity
+visible and policy-controlled instead of invisible.
+
 ### Public API (target shape)
 
 ```python
@@ -801,13 +844,23 @@ deterministic string/hash match). Custom invariants: Python callables registered
 (`invariants.py`), receiving a read-only `ChaosRun` view. Evaluation happens post-run (stream is
 persisted), so failures show *which event* violated what.
 
-**Production-safety boundary (spec §14 Q14 — mandatory):** chaos refuses to run unless the target
-declares `mode: simulation` (all external I/O must pass through registered test doubles; any
-unmatched real socket attempt aborts the run — enforced with the same socket-guard used in §9) or
-`mode: sandbox` (explicit allowlist of local endpoints, e.g. a local Stripe mock; still
-deny-by-default). There is deliberately **no `mode: production`.** Fault adapters patch client
-libraries and ART components — they never touch real infrastructure. This is a hard product
-boundary, documented in SECURITY.md.
+**Production-safety boundary (spec §14 Q14 — mandatory, with honest isolation levels):** chaos
+refuses to run unless the target declares `mode: simulation` (all external I/O must pass through
+registered test doubles; any unmatched real socket attempt aborts the run — enforced with the
+same socket-guard used in §9) or `mode: sandbox` (explicit allowlist of local endpoints, e.g. a
+local Stripe mock; still deny-by-default). There is deliberately **no `mode: production`**, and
+fault adapters patch client libraries and ART components — they never target real infrastructure.
+
+The isolation model is staged and its limits are stated, not hidden. The plan distinguishes three
+distinct things: **deterministic simulation** (scripted model stub + test doubles — reproducible
+by construction), **application-level fault injection** (in-process patching + socket guard +
+subprocess restrictions — *best-effort containment*: a Python-level socket guard cannot stop
+native extensions or subprocesses that bypass Python's socket layer, and the docs say so), and
+**OS-level isolation** (container boundary, network namespace, OS sandbox, explicit target
+allowlist — the *strong* boundary, recommended for CI and required before any claim of hard
+containment). Before strong sandboxing ships, all chaos documentation describes the guard as
+best-effort with visible limitations; ART never claims that an application-level guard makes it
+"physically unable" to reach production. This staging is documented in SECURITY.md.
 
 **Outputs:** `ChaosReport` (JSON, schema-versioned) + human text: per-scenario verdict, invariant
 evaluations with evidence event ids, fault schedule, seed, environment digest; `--format sarif`
@@ -1255,64 +1308,83 @@ records decision · context/options · trade-offs & consequences · revisit trig
 
 ---
 
-## 30. Complete milestone plan
+## 30. Milestone plan (architecture roadmap — not automatically committed)
 
-Every milestone ends with main releasable and all gates green (spec §3.7). PR details:
-[`PLAN-PRS.md`](PLAN-PRS.md).
+Milestones A–N are the **architecture roadmap**: they show how the complete system decomposes
+and what "done" means for each component. They are **not automatically committed** — commitment
+status is per milestone below. **Committed** work lives in `EXECUTION.md` (E01–E14, which
+resequences and narrows Milestones A–E); **gated** milestones proceed when their §37 validation
+gate opens (or via a documented gate override); **optional** components may never be built
+without harming v1.0; **validation-only** means scope is set by which gates actually opened.
+Every milestone, when executed, still ends with main releasable and all gates green (spec §3.7).
+PR details: [`PLAN-PRS.md`](PLAN-PRS.md).
 
-| Milestone | Goal | PRs | Release | Exit criteria |
-|---|---|---|---|---|
-| **A — Repository & governance foundation** | Complete OSS repo skeleton: license, governance, CI, fixtures scaffold, first ADRs | PR-001…004 | — | CI green on empty-but-installable workspace; all governance docs present; ADRs 001–004/007/008 merged |
-| **B — Core domain & CLI walking skeleton** | `agent-lint scan` returns one real finding (AR001) end-to-end; egress broker + offline guard in place | PR-005…011 | **v0.1.0** | Fixture scan produces AR001 in text/JSON; offline CI job green; PyPI packages install |
-| **C — Static analyzer MVP** | 12+ deterministic rules, SARIF, baselines, suppressions, explain, hardening | PR-012…023 | **v0.2.0** | All C-rules pass fixture harness incl. cross-rule FP net; SARIF validates; unsafe example repo yields documented findings, safe variant clean |
-| **D — LangGraph plugin** | Framework-aware IR + LG-rules; plugin loading proven | PR-024…031 | **v0.3.0** | LangGraph fixtures produce LG/AR findings with framework evidence; version-matrix job green |
-| **E — CI integration** | GitHub Action, SARIF upload, changed-files, log hygiene | PR-032…036 | **v0.4.0** | Action runs on examples in this repo's CI; annotations visible; canary secrets absent from logs |
-| **F — ReplaySafe MVP** | SQLite ledger, decorator, claims, verify-before-retry, compensation, CLI | PR-037…045 | **v0.5.0** | Crash/concurrency suites green; duplicate-delivery demo executes charge exactly once; semantics doc normative |
-| **G — ReplaySafe production adapters** | Postgres, Redis locks, stress suites, AR012 | PR-046…052 | v0.5.x | Backend parity suite green on SQLite+PG; stress: N workers × M dupes ⇒ at-most-once |
-| **H — Agent Chaos MVP** | Scenario runner, fault catalog, invariants, pytest plugin | PR-053…060 | **v0.6.0** | Shipped scenarios reproduce byte-identically by seed; simulation boundary blocks real sockets; ReplaySafe acceptance scenarios green |
-| **I — Agent Contract MVP** | Contract format, test/diff/fuzz, IR feedback | PR-061…067 | **v0.7.0** | Contract suite runs on example tools + MCP fixture server; diff catches seeded breaking changes; fuzz finds seeded error-contract bug |
-| **J — VS Code integration** | LSP service + thin extension | PR-068…072 | **v0.8.0** | Extension shows diagnostics/quick fixes on example repo; bundle audit green; marketplace listing |
-| **K — MCP reliability support** | Manifest frontend, contract adapter, wrapper, trust rules | PR-073…077 | **v0.9.0** | MCP fixture server: scan+contract+wrap all work within TB9 bounds |
-| **L — n8n support** | Workflow analysis + reliability nodes + simulation | PR-078…083 | v0.9.x | n8n fixture workflows yield N8N findings; nodes pass n8n lint & publish to npm; simulation validates error paths |
-| **M — Optional model advisor** | Isolated advisor, local+remote providers, approval UX | PR-084…087 | v0.9.x | Offline degradation test green; injection canaries never trigger egress; audit records complete |
-| **N — v1 hardening** | Security audit, perf, API freeze, migrations, docs, supply chain | PR-088…095 | **v1.0.0** | §36 definition of readiness fully checked |
+Release numbers in this table are the original architecture-era ladder; the committed wave
+redefined v0.1.0–v0.5.x (see `EXECUTION.md`). Gated milestones ship under the next available
+version when they open — their *content* promises are unchanged.
 
-Sequencing notes: F/G (runtime plane) share no code path with D/E (analysis plane) beyond
-`agent-core`, so teams can parallelize C→D→E and F→G once B lands; H depends on F (ledger
-invariants) and the scripted stub only; I depends on C (IR) not on H.
+| Milestone | Goal | Catalog PRs | Release (architecture-era) | Commitment status | Exit criteria |
+|---|---|---|---|---|---|
+| **A — Repository & governance foundation** | Complete OSS repo skeleton: license, governance, CI, fixtures scaffold, first ADRs | PR-001…004 | — | **Committed** in minimal form (E01); full governance behind the governance-expansion gate | CI green on installable package; minimal governance docs present; decision log started |
+| **B — Core domain & CLI walking skeleton** | `agent-lint scan` returns one real finding (AR001) end-to-end; offline guard in place | PR-005…011 | v0.1.0 | **Committed** (E02–E04); Egress Broker *object* deferred to the advisor gate (socket guard stands in) | Fixture scan produces AR001 in text; socket-guard CI green; PyPI package installs |
+| **C — Static analyzer MVP** | 12+ deterministic rules, SARIF, baselines, suppressions, explain, hardening | PR-012…023 | v0.2.0 | **Committed** as a subset (E05–E07, E10, E13: 7 rules + SARIF + suppressions + baselines + hardening); remaining rule depth decided at E14 | Shipped rules pass fixture harness incl. cross-rule FP net; SARIF validates; unsafe example yields documented findings, safe variant clean |
+| **D — LangGraph plugin** | Framework-aware IR + LG-rules; plugin loading proven | PR-024…031 | v0.3.0 | **Committed** in reduced, in-package form (E08–E09: recognition + LG002/LG003/LG006); plugin *loading* (PR-024) and remaining LG rules **gated** | LangGraph fixtures produce LG/AR findings with framework evidence; negative-detection corpus clean |
+| **E — CI integration** | GitHub Action, SARIF upload, changed-files, log hygiene | PR-032…036 | v0.4.0 | **Committed** in minimal form (E11: path/format/fail-on; E13 adds changed-files/baseline) | Action runs on examples in CI; annotations visible; canary secrets absent from logs |
+| **F — ReplaySafe MVP** | SQLite ledger, decorator, claims, verify-before-retry, compensation, CLI | PR-037…045 | v0.5.0 | **Gated** — ReplaySafe gate (§37) | Crash/concurrency suites green; duplicate-delivery demo executes the charge once (deduped, ambiguity blocked); semantics doc normative |
+| **G — ReplaySafe production adapters** | Postgres, Redis locks, stress suites, AR012 | PR-046…052 | v0.5.x | **Gated** — Postgres/Redis gate (§37); requires F | Backend parity suite green on SQLite+PG; storm tests: duplicates deduped, no ambiguous re-execution |
+| **H — Agent Chaos MVP** | Scenario runner, fault catalog, invariants, pytest plugin | PR-053…060 | v0.6.0 | **Gated** — chaos gate (§37) | Shipped scenarios reproduce byte-identically by seed; staged isolation model enforced and documented; ReplaySafe acceptance scenarios green |
+| **I — Agent Contract MVP** | Contract format, test/diff/fuzz, IR feedback | PR-061…067 | v0.7.0 | **Gated** — contract gate (§37) | Contract suite runs on example tools + MCP fixture server; diff catches seeded breaking changes; fuzz finds seeded error-contract bug |
+| **J — VS Code integration** | LSP service + thin extension | PR-068…072 | v0.8.0 | **Gated** — VS Code gate (§37) | Extension shows diagnostics/quick fixes on example repo; bundle audit green; marketplace listing |
+| **K — MCP reliability support** | Manifest frontend, contract adapter, wrapper, trust rules | PR-073…077 | v0.9.0 | **Gated** — MCP gate (§37) | MCP fixture server: scan+contract+wrap all work within TB9 bounds |
+| **L — n8n support** | Workflow analysis + reliability nodes + simulation | PR-078…083 | v0.9.x | **Gated** — n8n gate (§37) | n8n fixture workflows yield N8N findings; nodes pass n8n lint & publish to npm; simulation validates error paths |
+| **M — Optional model advisor** | Isolated advisor, local+remote providers, approval UX | PR-084…087 | v0.9.x | **Optional** — advisor gate (§37); optional forever, never a security authority | Offline degradation test green; injection canaries never trigger egress; audit records complete |
+| **N — v1 hardening** | Security audit, perf, API freeze, migrations, docs, supply chain | PR-088…095 | v1.0.0 | **Validation-only** — scope set by which gates opened; hardening applies to whatever shipped | §36 definition of readiness fully checked for the shipped scope |
+
+Sequencing notes (architectural dependencies, valid whenever gates open): F/G (runtime plane)
+share no code path with D/E (analysis plane) beyond `agent-core`, so waves can parallelize once
+the core exists; H depends on F (ledger invariants) and the scripted stub only; I depends on C
+(IR) not on H. The E14 evidence review is the standing mechanism that converts gated milestones
+into committed waves.
 
 ---
 
-## 31. Complete ordered PR plan
+## 31. Architectural PR catalog
 
-The full plan — one subsection per PR with all 25 required fields — is in
-[`PLAN-PRS.md`](PLAN-PRS.md). Summary: **95 PRs**, PR-001…PR-095, ordered, grouped by milestone
-A–N, with release-boundary PRs flagged. Complexity distribution: ~30 small, ~45 medium,
-~20 large. ~35 PRs are marked external-contributor-friendly (rules, fixtures, fault adapters,
-docs).
+The full catalog — one subsection per PR with all 25 required fields — is in
+[`PLAN-PRS.md`](PLAN-PRS.md): **95 PRs**, PR-001…PR-095, grouped by milestone A–N in
+*architectural dependency order*, with release-boundary PRs flagged. The catalog proves the
+system has been decomposed end to end; **it is not the committed merge order**. The active
+sequence is `EXECUTION.md` (E01–E14), which maps onto catalog PRs via the table in
+`PLAN-PRS.md`'s header; later catalog PRs may be reordered, merged, split, or deferred after
+validation. Complexity distribution: ~30 small, ~45 medium, ~20 large. ~35 PRs are marked
+external-contributor-friendly (rules, fixtures, fault adapters, docs).
 
 ---
 
 ## 32. Release checkpoints
 
-| Version | Boundary PR | Contents (cumulative) | "Why anyone installs it" |
-|---|---|---|---|
-| v0.1.0 | PR-011 | Walking skeleton: scan + AR001, JSON/text, offline guarantee | Early adopters validate the approach; the finding is real |
-| v0.2.0 | PR-023 | 12+ rules, SARIF, baselines, suppressions, explain | **First genuinely useful release** — standalone lint value |
-| v0.3.0 | PR-031 | LangGraph-aware findings | The LangGraph community's linter |
-| v0.4.0 | PR-036 | GitHub Action + annotations | Team-wide enforcement without infra |
-| v0.5.0 | PR-045 (+G in v0.5.x) | ReplaySafe SQLite runtime (then PG/Redis) | Retry-safety in an afternoon |
-| v0.6.0 | PR-060 | Agent Chaos MVP | Prove invariants under faults in CI |
-| v0.7.0 | PR-067 | Tool contracts MVP | Stop breaking tool changes at review time |
-| v0.8.0 | PR-072 | VS Code integration | Findings where developers live |
-| v0.9.0 | PR-077 (+L/M in v0.9.x) | MCP support (then n8n, advisor) | Reliability for the MCP ecosystem |
-| v1.0.0 | PR-095 | Hardened, audited, stable APIs | Production-credible commitment |
+**Committed** releases come from `EXECUTION.md`; **gated** rows below describe the release
+*content* each gated milestone delivers when its §37 gate opens (under the next available
+version number at that time — the architecture-era numbers are kept for reference only).
 
-The spec's sequence is kept unchanged: lint-first builds the audience and the IR that every later
-component reuses; ReplaySafe before chaos because chaos's most valuable invariants query the
-ledger; contracts after chaos only because the IR/confidence loop benefits from field experience —
-teams wanting contracts earlier can lift Milestone I ahead of H with no dependency violation
-(noted in PLAN-PRS.md dependencies).
+| Version (architecture-era) | Boundary PR | Contents (cumulative) | Commitment status | "Why anyone installs it" |
+|---|---|---|---|---|
+| v0.1.0 | E04 (catalog PR-009) | CLI + safe parsing + AR001, offline guarantee | **Committed** | Early adopters validate the approach; the finding is real |
+| v0.2.0 | E07 (catalog PR-012/013/015/021 subset) | AR001/003/014, JSON/SARIF, explain, suppressions | **Committed** | **First genuinely useful release** — standalone lint value |
+| v0.3.0 | E09 (catalog PR-025…028 subset) | LangGraph-aware findings | **Committed** | The LangGraph community's linter |
+| v0.4.0 | E12 (catalog PR-033…035 subset + launch) | Hardened scanner + GitHub Action + public launch | **Committed** | Team-wide enforcement without infra, safe on untrusted repos |
+| v0.5.x | E13 (catalog PR-014…017/032 subset) | Baselines, changed-files, suppression lifecycle, AR002/AR011 | **Committed** | Brownfield adoption + the retry-safety headline |
+| — | PR-045 (+G) | ReplaySafe SQLite runtime (then PG/Redis) | **Gated** (ReplaySafe gate) | Retry-safety in an afternoon |
+| — | PR-060 | Agent Chaos MVP | **Gated** (chaos gate) | Prove invariants under faults in CI |
+| — | PR-067 | Tool contracts MVP | **Gated** (contract gate) | Stop breaking tool changes at review time |
+| — | PR-072 | VS Code integration | **Gated** (VS Code gate) | Findings where developers live |
+| — | PR-077 (+L/M) | MCP support (then n8n, advisor) | **Gated** (MCP/n8n gates; advisor optional) | Reliability for the MCP ecosystem |
+| v1.0.0 | PR-095 | Hardened, audited, stable APIs for the shipped scope | **Validation-only** | Production-credible commitment |
+
+Architectural sequencing rationale (valid whenever gates open): lint-first builds the audience
+and the IR every later component reuses; ReplaySafe before chaos because chaos's most valuable
+invariants query the ledger; contracts benefit from field experience but can open earlier with
+no dependency violation. The E14 evidence review decides actual order.
 
 ---
 
@@ -1328,8 +1400,9 @@ teams wanting contracts earlier can lift Milestone I ahead of H with no dependen
 | R6 | **Solo-maintainer bus factor / contributor drought** | Medium/Medium | 35 contributor-friendly PRs; rule authoring guide + fixture harness make rules a 1-file contribution; GOVERNANCE.md defines maintainer path |
 | R7 | **Security incident in the toolkit itself** (ironic, fatal to trust) | Low/Critical | Threat model with tests per threat (§25); malicious-repo fixtures in CI; SECURITY.md disclosure; audit at N; minimal dependencies |
 | R8 | **Chaos harness touches something real** | Low/Critical | No production mode exists; socket-guard enforcement; simulation-only defaults (§17) |
-| R9 | **95-PR plan stalls before value** | Medium/High | Value front-loaded: v0.2 (PR-023) is standalone-useful; every milestone releasable; PR order = value order |
-| R10 | **n8n/TS scope drags Python velocity** | Medium/Low | Isolated workspaces (ADR-021); Milestone L late and skippable without affecting v1 core claims **[ASSUMPTION: L may slip past v1.0 if needed — flagged as the designated de-scope]** |
+| R9 | **Plan stalls before value** | Medium/High | The committed wave (`EXECUTION.md`) front-loads value: first real finding at v0.1.0 (E04), useful standalone linter at v0.2.0, public launch at v0.4.0; every release independently useful; later work is gated, so a stall strands no half-built component |
+| R10 | **n8n/TS scope drags Python velocity** | Medium/Low | Isolated workspaces (ADR-021); n8n is gated (§37) and skippable without affecting v1 core claims |
+| R11 | **Validation gates never open** (demand exists but signals never cross thresholds, or the audience never finds the project) | Medium/High | Gates are demand *instruments*, not passive waiting: findings and issue templates actively measure demand (AR002/AR011 link "did this bite you?"); gate overrides available through public ADR; periodic E14-style reassessment with a scheduled review date; maintainers may choose more lint depth instead of waiting — forward motion never requires a gate |
 
 ---
 
@@ -1359,13 +1432,16 @@ No open question blocks PR-001…PR-011 except #11, which PR-001 resolves.
 
 ## 35. Recommended first implementation PR
 
-**PR-001 — Repository bootstrap and governance foundation** (full detail in PLAN-PRS.md): license,
-governance docs, templates, name verification (#11 above). It is deliberately boring — the first
-*payoff* PR is **PR-009**, the walking skeleton, where `agent-lint scan fixtures/rules/AR001/unsafe`
-prints a real finding with a real rule ID, offline, end to end through parser → IR → rule engine →
-reporter. Everything between PR-001 and PR-009 exists only to make PR-009 honest (installable
-packages, domain model, engine, frontend). An implementing agent should treat PR-009 as the first
-milestone-defining target and PR-001…008 as its shortest honest path.
+**E01 — Minimal OSS bootstrap** (full detail in `EXECUTION.md`) starts the repository: license,
+minimal governance, one CI workflow, the single `agent-lint` distribution with the permanent
+`agent_reliability.{core,lint}` namespace, and the PyPI name verification (#11 above). It is
+deliberately boring — the first *product value* ships in **E04**, where
+`agent-lint scan fixtures/rules/AR001/unsafe` prints a real finding with a real rule ID, offline,
+end to end through parser → micro-IR → rule → reporter, released as **v0.1.0**. Everything
+between E01 and E04 exists only to make E04 honest (final-shaped contracts, safe frontend). An
+implementing agent should treat E04 as the first milestone-defining target and E01–E03 as its
+shortest honest path. (The catalog equivalents, PR-001/PR-009, remain in `PLAN-PRS.md` as the
+architecture-era decomposition.)
 
 ---
 
@@ -1397,6 +1473,141 @@ v1.0.0 ships when **all** of the following are demonstrably true (each maps to a
     agent — showing: lint catches the seeded defects; ReplaySafe survives the duplicate-webhook
     and crash chaos scenarios with the payment invariant proven; the whole story runs offline in
     one `make demo`.
+
+---
+
+## 37. Validation gates
+
+Every component beyond the committed execution wave proceeds through a gate: a measurable,
+publicly tracked demand signal. Gates are **decision aids, not scientific laws** — and they must
+not become permanent vetoes (see the override rule below). Gate status is tracked on the public
+roadmap page; the E14-style evidence review (recurring after every wave) scores each gate and
+publishes the decision as an ADR. `EXECUTION.md` carries the same gates operationally; this
+section is normative.
+
+| Gate | Opens when | Notes |
+|---|---|---|
+| **ReplaySafe** (Milestone F) | *Standard:* ≥5 distinct retry/resume/duplicate-side-effect failure reports, from ≥3 independent users/teams/orgs, with ≥2 reproducible as fixtures or minimal examples. *Severe-event exception:* one severe, reproducible incident — payment duplication, destructive duplicate action, high-cost runaway retry, or compliance-impacting uncertain execution — may open the milestone via ADR | AR002/AR011 findings link the "did this bite you?" template — the gate's primary instrument |
+| **Agent Chaos** (Milestone H) | ≥3 independent users/teams request reproducible fault testing; ≥2 requested scenarios representable as deterministic fixtures; ReplaySafe or agent-lint has already exposed concrete failure classes worth testing | |
+| **Agent Contract** (Milestone I) | ≥3 distinct schema-drift/parameter-drift/tool-contract regression cases reported; ≥2 with before/after schemas, code, or fixtures; plain JSON Schema validation shown insufficient | |
+| **MCP** (Milestone K) | A user or maintainer provides a concrete MCP integration target; a reproducible fixture/manifest/test server exists; the need is clearly differentiated from existing MCP security scanners | ADR-022 scope doctrine still applies |
+| **n8n** (Milestone L) | Any of: ≥3 real exported workflows available as sanitized fixtures; a contributor commits to maintaining n8n fixtures; a repeated reliability failure appears across multiple workflows | |
+| **Plugin entry-point loading** (catalog PR-024) | A third-party adapter is proposed; it must ship outside the main distribution; the Frontend/Rule contracts have survived ≥2 public releases | Until then, first-party integrations are internal modules behind the same contracts |
+| **PostgreSQL/Redis backends** (Milestone G) | ≥2 ReplaySafe users require multi-process/multi-host coordination; SQLite limitations reproduced and documented; Ledger/Lock contracts stable | Requires F open |
+| **VS Code** (Milestone J) | CLI output and rule IDs stable for ≥2 public releases; ≥10 explicit requests/confirmations that editor integration would materially help; the extension reuses the engine with zero duplicated analysis logic | |
+| **Model advisor** (Milestone M) | Users explicitly request model-assisted explanation/patch generation; deterministic explain/remediation already mature; the Egress Broker exists; payload preview, redaction, allowlisting, approval implemented | **Optional forever. Can never become a security or authorization authority** |
+| **Governance expansion** | 5+ non-maintainer contributors, recurring review conflicts, multiple maintainers/release owners, or security-sensitive external plugins | Do not front-load governance bureaucracy |
+| **Package split** (`agent-reliability-core` as own distribution) | ReplaySafe needs a runtime-neutral core, a third-party plugin needs a stable dependency, or products need independent release cycles | Never split merely because a version number was reached |
+
+**Gate override rule.** Maintainers may open a gated milestone without meeting the numeric
+threshold when one of these applies: severe reproducible failure; strategic integration; funded
+or committed contributor; ecosystem change; security incident; strong maintainer evidence. Every
+override requires a **public ADR** with the evidence, explicit trade-offs, a review date, and
+success/failure criteria.
+
+---
+
+## 38. Open-source strategy
+
+The community model, designed alongside the architecture rather than after it. `EXECUTION.md`
+carries the short practical form; this section is the full version.
+
+### 38.1 Contributor onboarding
+
+The path from stranger to first merged PR is designed to take **under 30 minutes**: clone →
+`uv sync` → `pytest` (green on first run, no services) → `agent-lint scan fixtures/rules/AR001/unsafe`
+(see a finding) → copy an existing rule directory and modify it. CONTRIBUTING.md is written as
+exactly this walkthrough, and a maintainer re-validates it (with a stopwatch) each release.
+
+### 38.2 How to add a rule
+
+A rule is one directory: `rule.py` (logic + metadata), `docs.md` (catalog page + explain
+content), `fixtures/` with **at least one true positive, one safe control, one edge case**, and
+`expected.json` (exact expected output). The `art-rule-test` harness enforces the contract
+mechanically — including the cross-rule false-positive net (no rule may fire on any safe control
+repo-wide). Rules cannot perform I/O by construction (the `RuleContext` API exposes none), so a
+rule PR needs only ordinary review. The add-a-rule guide walks through AR003 as the reference.
+
+### 38.3 How to contribute a failure fixture
+
+Users can contribute: sanitized code, a simplified reproduction, a workflow fragment, a trace
+excerpt, the expected safe/unsafe behavior, and tool/framework versions. A dedicated issue
+template collects these; maintainers (or the contributor) convert them into fixture directories.
+**Fixtures become part of the permanent regression suite** — they are never deleted, only
+superseded, and each carries provenance metadata (source issue, versions).
+
+### 38.4 Good-first-issue design
+
+Good-first issues are **bounded by construction**: add a safe-control fixture; add an SDK
+call-pattern/known-tool table entry (with a documentation citation); improve a rule explanation;
+add a malformed-input case; document a false positive; add a secret-format redaction case.
+Architecture changes, security boundaries, parser internals, and fingerprint/redaction logic are
+**never** labeled good-first. Each seeded issue names the exact files to touch and the test that
+proves completion.
+
+### 38.5 Maintainer review boundaries
+
+Two review tiers. **Maintainer-gated** (stronger review, CODEOWNERS once volume justifies it):
+engine internals, parser safety, fingerprint algorithm, redaction, network policy and the socket
+guard, security boundaries, ReplaySafe state semantics (when gated open), plugin loading.
+**Open path** (any maintainer approval): rules, fixtures, table entries with citations, docs,
+examples. The boundary is documented in CONTRIBUTING.md so external contributors know which
+lane they're in before writing code.
+
+### 38.6 Plugin compatibility
+
+A stable contract version (`CORE_API_VERSION`), explicit compatibility metadata in plugin
+distributions (`core_api_version_required`), a public deprecation policy (≥1 minor release of
+warning), **no silent plugin activation** (installed ≠ enabled for third-party plugins), and
+third-party plugins treated as trusted dependencies the *user* chose — the same trust model as
+any package in their environment (TB8). First-party integrations remain internal modules until
+the plugin-loading gate opens, behind the same contracts.
+
+### 38.7 Public RFC process
+
+Major changes — new components, schema changes, security-boundary changes, gate overrides —
+start as a **GitHub Discussion with an RFC document**: motivation, design, alternatives
+considered, security/privacy impact, migration plan. After a comment window, the decision is
+recorded as an ADR (superseding the lightweight `docs/DECISIONS.md` log from launch onward).
+Rule additions and fixtures do not need RFCs.
+
+### 38.8 Release communication
+
+Every release ships notes answering: what problem was solved; a demo (recording or transcript);
+the install command; breaking changes; known limitations (honest, specific); contribution
+requests ("we need SDK table entries for X"); and **open validation questions** ("does AR011's
+posture match your codebase? tell us here"). Releases are announced in the same channels every
+time so the community knows where to look.
+
+### 38.9 Community feedback loops
+
+Instruments, not vibes: issue templates (bug report, false positive, **"did this catch a real
+bug?"**, **"did this bite you?"** on retry-safety findings); GitHub Discussions categories (Q&A,
+rule ideas, failure stories, roadmap); public roadmap voting (reactions on gate-tracking
+issues); release feedback threads. Every instrument feeds the recurring E14-style evidence
+review that scores validation gates.
+
+### 38.10 Bug report → regression fixture pipeline
+
+1. User reports (any template).
+2. Maintainer or contributor reproduces.
+3. Reproduction is sanitized (secrets/identifiers stripped, minimal form).
+4. Converted into a fixture directory with provenance metadata.
+5. A failing regression test lands *first*.
+6. The fix lands, turning the test green.
+7. The fixture is kept permanently (false-negative corpus or rule fixtures).
+8. The contributor is credited in the changelog when they permit it.
+
+### 38.11 Adoption data without telemetry
+
+The project ships **no phone-home telemetry, no repository fingerprinting, no hidden analytics —
+permanently** (§3.4 is unchanged by community needs). Adoption evidence uses only public or
+user-supplied signals: GitHub stars/forks (weak awareness signal only); issues and discussions;
+contributor counts; the public dependency graph; public GitHub Action usage visible in
+consumers' workflows; **PyPI downloads as a trend only — explicitly not proof of active use**;
+fixture submissions; explicit confirmations of caught bugs (the strongest signal — each becomes
+a case study with permission); repeat participants in discussions. The E14 scorecard evaluates
+every gate against these signals and says which were used.
 
 ---
 
