@@ -1,0 +1,18 @@
+{
+  "agents": [
+    {
+      "has_step_bound": false,
+      "name": "run_agent",
+      "step_bound_source": null
+    }
+  ],
+  "diagnostic_count": 0,
+  "retry_policies": [],
+  "tool_calls": [
+    {
+      "callee": "client.step",
+      "timeout_present": false,
+      "timeout_seconds": null
+    }
+  ]
+}

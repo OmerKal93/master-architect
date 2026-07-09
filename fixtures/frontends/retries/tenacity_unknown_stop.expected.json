@@ -1,0 +1,12 @@
+{
+  "agents": [],
+  "diagnostic_count": 0,
+  "retry_policies": [
+    {
+      "bound": "unknown",
+      "max_attempts": null,
+      "source": "tenacity"
+    }
+  ],
+  "tool_calls": []
+}

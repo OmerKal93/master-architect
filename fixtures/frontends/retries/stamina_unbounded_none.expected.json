@@ -1,0 +1,18 @@
+{
+  "agents": [],
+  "diagnostic_count": 0,
+  "retry_policies": [
+    {
+      "bound": "unbounded",
+      "max_attempts": null,
+      "source": "stamina"
+    }
+  ],
+  "tool_calls": [
+    {
+      "callee": "stamina.retry",
+      "timeout_present": false,
+      "timeout_seconds": null
+    }
+  ]
+}

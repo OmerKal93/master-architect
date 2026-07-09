@@ -1,0 +1,12 @@
+{
+  "agents": [],
+  "diagnostic_count": 0,
+  "retry_policies": [],
+  "tool_calls": [
+    {
+      "callee": "client.payments.charges.create",
+      "timeout_present": true,
+      "timeout_seconds": 15.0
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "agents": [],
+  "diagnostic_count": 0,
+  "retry_policies": [
+    {
+      "bound": "bounded",
+      "max_attempts": 3,
+      "source": "manual-loop"
+    }
+  ],
+  "tool_calls": []
+}

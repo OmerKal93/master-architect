@@ -16,3 +16,11 @@ release cadence justifies automation (see `EXECUTION.md`, deferred: full release
   `RetryPolicy`, `ToolCall`, `TimeoutPolicy`), the minimal `.agent-reliability.yaml` config
   loader, and the `Rule`/`RuleContext`/`Frontend` contracts every rule and frontend will
   implement. Published subset schema at `docs/schemas/finding-v1.json`. (E02)
+- The safe Python frontend (`agent_reliability.lint.frontend`): resource-limited, symlink-safe
+  file discovery with a minimal `.gitignore` matcher; safe AST parsing that never imports or
+  executes scanned code and never hangs or crashes on hostile input (deeply nested expressions,
+  oversized files, malicious filenames, symlink escapes); and heuristic lowering of agentic
+  loops, tool-call sites, and retry patterns (tenacity, stamina, manual loops) into the micro-IR.
+  See `docs/architecture/what-the-analyzer-sees.md` for the honest capability statement, and
+  `fixtures/malicious/` / `fixtures/frontends/` for the hostile-input and golden-IR fixture
+  corpora. (E03)

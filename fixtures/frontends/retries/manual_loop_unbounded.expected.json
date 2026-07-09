@@ -1,0 +1,18 @@
+{
+  "agents": [
+    {
+      "has_step_bound": false,
+      "name": null,
+      "step_bound_source": null
+    }
+  ],
+  "diagnostic_count": 0,
+  "retry_policies": [
+    {
+      "bound": "unbounded",
+      "max_attempts": null,
+      "source": "manual-loop"
+    }
+  ],
+  "tool_calls": []
+}

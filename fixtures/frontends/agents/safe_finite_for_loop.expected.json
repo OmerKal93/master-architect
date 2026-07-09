@@ -1,0 +1,12 @@
+{
+  "agents": [],
+  "diagnostic_count": 0,
+  "retry_policies": [],
+  "tool_calls": [
+    {
+      "callee": "client.process",
+      "timeout_present": false,
+      "timeout_seconds": null
+    }
+  ]
+}
