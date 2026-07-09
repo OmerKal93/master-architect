@@ -1,5 +1,9 @@
 """Shared domain model and engine contracts.
 
-Empty in this PR (E01). The finding model, rule/frontend contracts, and micro-IR land in E02;
-see ``EXECUTION.md``.
+- ``agent_reliability.core.model`` — findings, the micro-IR, and minimal config (E02).
+- ``agent_reliability.core.contracts`` — the ``Rule``/``RuleContext`` and ``Frontend``
+  protocols every analyzer capability implements (E02).
+
+The full rule engine (dedupe, baselines, suppressions), the trace/audit store, and the Egress
+Broker are not part of this package yet — see ``EXECUTION.md`` for what is deferred and why.
 """

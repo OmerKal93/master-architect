@@ -1,0 +1,107 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/OmerKal93/master-architect/docs/schemas/finding-v1.json",
+  "title": "Agent Reliability Toolkit Finding (subset schema, v1)",
+  "description": "The published, in-repo subset schema for agent_reliability.core.model.Finding as serialized by agent_reliability.core.model.serialize.finding_to_dict. This is a SUBSET: it covers only the fields that exist as of E02 (EXECUTION.md). Fields are added here as later PRs add them to the Finding model; existing fields and their types are never renamed or changed incompatibly (see PLAN.md section 13).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "rule_id",
+    "rule_version",
+    "title",
+    "description",
+    "severity",
+    "confidence",
+    "category",
+    "framework",
+    "span",
+    "additional_spans",
+    "evidence",
+    "why_it_matters",
+    "remediation",
+    "references",
+    "fingerprint",
+    "finding_id"
+  ],
+  "properties": {
+    "rule_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "e.g. AR001"
+    },
+    "rule_version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "title": { "type": "string" },
+    "description": { "type": "string" },
+    "severity": {
+      "type": "string",
+      "enum": ["critical", "high", "medium", "low", "info"]
+    },
+    "confidence": {
+      "type": "string",
+      "enum": ["high", "medium", "low"]
+    },
+    "category": {
+      "type": "string",
+      "enum": [
+        "loop-safety",
+        "retry-safety",
+        "side-effects",
+        "timeouts",
+        "context-hygiene",
+        "permissions",
+        "data-exposure",
+        "auditability",
+        "concurrency",
+        "recovery"
+      ]
+    },
+    "framework": {
+      "type": ["string", "null"],
+      "description": "null means framework-agnostic/generic."
+    },
+    "span": { "$ref": "#/$defs/span" },
+    "additional_spans": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/span" }
+    },
+    "evidence": {
+      "type": "string",
+      "maxLength": 400,
+      "description": "Length-capped at construction time; see Finding.MAX_EVIDENCE_LENGTH."
+    },
+    "why_it_matters": { "type": "string" },
+    "remediation": { "type": "string" },
+    "references": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "fingerprint": {
+      "type": "string",
+      "pattern": "^fp_v1:[0-9a-f]{64}$"
+    },
+    "finding_id": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "$defs": {
+    "span": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["file", "start_line", "start_col", "end_line", "end_col"],
+      "properties": {
+        "file": {
+          "type": "string",
+          "description": "Repo-relative, POSIX-normalized. Never absolute, never backslash-separated."
+        },
+        "start_line": { "type": "integer", "minimum": 1 },
+        "start_col": { "type": "integer", "minimum": 0 },
+        "end_line": { "type": "integer", "minimum": 1 },
+        "end_col": { "type": "integer", "minimum": 0 }
+      }
+    }
+  }
+}
