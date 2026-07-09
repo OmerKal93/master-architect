@@ -10,7 +10,20 @@ no cloud account, no telemetry, no API key, `network: deny` by default.
 
 ## Status
 
-**Planning phase.** No production code exists yet, by design.
+**Early implementation.** Planning is complete (see below); execution of the first committed
+wave (`EXECUTION.md` E01–E14) is underway. Nothing is published to PyPI yet. Track progress
+against the wave in `EXECUTION.md`.
+
+## Development
+
+```bash
+git clone <this repo>
+cd master-architect/packages/agent-lint
+uv sync --dev
+uv run pytest
+```
+
+See `CONTRIBUTING.md` for the full contributor guide.
 
 ## Planning documents
 
