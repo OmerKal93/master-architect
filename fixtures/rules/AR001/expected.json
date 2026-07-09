@@ -1,0 +1,22 @@
+{
+  "edge/while_true_no_calls.py": [],
+  "safe/finite_for_loop.py": [],
+  "safe/recursive_with_bound.py": [],
+  "safe/while_true_with_bound.py": [],
+  "unsafe/recursive_no_bound.py": [
+    {
+      "category": "loop-safety",
+      "confidence": "high",
+      "rule_id": "AR001",
+      "severity": "high"
+    }
+  ],
+  "unsafe/while_true_no_bound.py": [
+    {
+      "category": "loop-safety",
+      "confidence": "high",
+      "rule_id": "AR001",
+      "severity": "high"
+    }
+  ]
+}

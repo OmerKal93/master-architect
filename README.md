@@ -11,8 +11,39 @@ no cloud account, no telemetry, no API key, `network: deny` by default.
 ## Status
 
 **Early implementation.** Planning is complete (see below); execution of the first committed
-wave (`EXECUTION.md` E01–E14) is underway. Nothing is published to PyPI yet. Track progress
-against the wave in `EXECUTION.md`.
+wave (`EXECUTION.md` E01–E14) is underway. `agent-lint` scans real code locally today (see the
+demo below); nothing is published to PyPI yet. Track progress against the wave in
+`EXECUTION.md`.
+
+## Demo
+
+```console
+$ pip install agent-lint          # not yet published — see Status above; today: uv sync from source
+$ cat agent.py
+def run_agent(client):
+    while True:
+        client.step()
+
+$ agent-lint scan agent.py
+[HIGH] AR001 agent.py:2
+  Agent loop has no maximum step count
+  evidence: while True: ... (no counter check + break/return found in the loop body)
+  why: An agent loop with no visible step bound can run indefinitely: a model that never
+  produces a stopping condition, a tool that never signals completion, or a bug in the loop's
+  own exit logic will not be caught by anything in this code. In production this shows up as
+  a hung process, runaway API cost, or an unbounded bill if the loop drives a paid external
+  call.
+  fix:  Add an explicit, checked upper bound on the number of iterations: a counter compared
+  against a maximum with a break or return, a bounded range, or (for LangGraph) a
+  recursion_limit passed at invocation.
+
+1 finding.
+$ echo $?
+1
+```
+
+Runs entirely offline — no account, no API key, no network access. See
+[`docs/quickstart.md`](docs/quickstart.md) for the full walkthrough.
 
 ## Development
 
@@ -21,6 +52,7 @@ git clone <this repo>
 cd master-architect/packages/agent-lint
 uv sync --dev
 uv run pytest
+uv run agent-lint scan ../../fixtures/rules/AR001/unsafe
 ```
 
 See `CONTRIBUTING.md` for the full contributor guide.

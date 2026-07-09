@@ -28,7 +28,7 @@ from __future__ import annotations
 import ast
 
 from agent_reliability.core.model.ir import RetryBound, RetryPolicy
-from agent_reliability.lint.frontend.ast_utils import dotted_name, span_of
+from agent_reliability.lint.frontend.ast_utils import dotted_name, span_of, structural_hash
 
 _TENACITY_DECORATOR_NAMES = {"retry", "tenacity.retry"}
 _STAMINA_DECORATOR_NAMES = {"stamina.retry", "retry"}
@@ -53,12 +53,14 @@ def _is_none(node: ast.expr | None) -> bool:
 
 
 def _tenacity_policy_from_call(call: ast.Call, *, relative_path: str) -> RetryPolicy:
+    hash_ = structural_hash(call)
     stop_kw = next((kw for kw in call.keywords if kw.arg == "stop"), None)
     if stop_kw is None:
         return RetryPolicy(
             span=span_of(call, relative_path=relative_path),
             bound=RetryBound.UNBOUNDED,
             source="tenacity",
+            structural_hash=hash_,
         )
     stop_value = stop_kw.value
     if (
@@ -72,28 +74,33 @@ def _tenacity_policy_from_call(call: ast.Call, *, relative_path: str) -> RetryPo
                 span=span_of(call, relative_path=relative_path),
                 bound=RetryBound.BOUNDED,
                 source="tenacity",
+                structural_hash=hash_,
                 max_attempts=literal,
             )
     return RetryPolicy(
         span=span_of(call, relative_path=relative_path),
         bound=RetryBound.UNKNOWN,
         source="tenacity",
+        structural_hash=hash_,
     )
 
 
 def _stamina_policy_from_call(call: ast.Call, *, relative_path: str) -> RetryPolicy:
+    hash_ = structural_hash(call)
     attempts_kw = next((kw for kw in call.keywords if kw.arg == "attempts"), None)
     if attempts_kw is None:
         return RetryPolicy(
             span=span_of(call, relative_path=relative_path),
             bound=RetryBound.UNKNOWN,
             source="stamina",
+            structural_hash=hash_,
         )
     if _is_none(attempts_kw.value):
         return RetryPolicy(
             span=span_of(call, relative_path=relative_path),
             bound=RetryBound.UNBOUNDED,
             source="stamina",
+            structural_hash=hash_,
         )
     literal = _literal_int(attempts_kw.value)
     if literal is not None:
@@ -101,10 +108,14 @@ def _stamina_policy_from_call(call: ast.Call, *, relative_path: str) -> RetryPol
             span=span_of(call, relative_path=relative_path),
             bound=RetryBound.BOUNDED,
             source="stamina",
+            structural_hash=hash_,
             max_attempts=literal,
         )
     return RetryPolicy(
-        span=span_of(call, relative_path=relative_path), bound=RetryBound.UNKNOWN, source="stamina"
+        span=span_of(call, relative_path=relative_path),
+        bound=RetryBound.UNKNOWN,
+        source="stamina",
+        structural_hash=hash_,
     )
 
 
@@ -168,6 +179,7 @@ def _manual_loop_policies(tree: ast.Module, *, relative_path: str) -> list[Retry
                     span=span_of(node, relative_path=relative_path),
                     bound=RetryBound.BOUNDED,
                     source="manual-loop",
+                    structural_hash=structural_hash(node),
                     max_attempts=literal,
                 )
             )
@@ -186,6 +198,7 @@ def _manual_loop_policies(tree: ast.Module, *, relative_path: str) -> list[Retry
                     span=span_of(node, relative_path=relative_path),
                     bound=RetryBound.UNBOUNDED,
                     source="manual-loop",
+                    structural_hash=structural_hash(node),
                 )
             )
     return policies

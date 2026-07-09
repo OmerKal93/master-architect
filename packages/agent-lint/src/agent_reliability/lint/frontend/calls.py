@@ -22,7 +22,7 @@ from __future__ import annotations
 import ast
 
 from agent_reliability.core.model.ir import TimeoutPolicy, ToolCall
-from agent_reliability.lint.frontend.ast_utils import dotted_name, span_of
+from agent_reliability.lint.frontend.ast_utils import dotted_name, span_of, structural_hash
 
 
 def _extract_timeout(call: ast.Call, *, relative_path: str) -> TimeoutPolicy:
@@ -58,6 +58,7 @@ def detect_tool_calls(tree: ast.Module, *, relative_path: str) -> tuple[ToolCall
             ToolCall(
                 span=span_of(node, relative_path=relative_path),
                 callee=callee,
+                structural_hash=structural_hash(node),
                 timeout=_extract_timeout(node, relative_path=relative_path),
             )
         )

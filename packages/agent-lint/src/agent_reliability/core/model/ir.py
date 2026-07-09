@@ -41,6 +41,12 @@ class RetryPolicy:
     bound: RetryBound
     source: str
     """Evidence provenance, e.g. ``"tenacity"``, ``"stamina"``, ``"manual-loop"``."""
+    structural_hash: str
+    """A hash of this construct's shape, excluding source positions — computed by the frontend
+    at lowering time (e.g. ``agent_reliability.lint.frontend.ast_utils.structural_hash``) from
+    the AST node this entity was derived from. This is what lets rules compute stable ``fp_v1``
+    fingerprints (``agent_reliability.core.model.fingerprint``) without needing raw AST access
+    themselves — the frontend is the only place that ever touches the AST."""
     max_attempts: int | None = None
     """Set only when ``bound is RetryBound.BOUNDED``."""
 
@@ -70,6 +76,9 @@ class ToolCall:
     span: SourceSpan
     callee: str
     """Best-effort dotted name of what's being called, e.g. ``"requests.post"``."""
+    structural_hash: str
+    """See ``RetryPolicy.structural_hash`` — same purpose, computed from this call site's AST
+    node by the frontend."""
     timeout: TimeoutPolicy | None = None
     """``None`` means no timeout evidence was even looked for at this call site (distinct from
     ``TimeoutPolicy(present=False)``, which means it *was* checked and found absent)."""
@@ -84,6 +93,9 @@ class Agent:
     has_step_bound: bool
     """True if a counter, recursion limit, or range bound was statically found constraining the
     loop's iteration count."""
+    structural_hash: str
+    """See ``RetryPolicy.structural_hash`` — same purpose, computed from this loop's/function's
+    AST node by the frontend."""
     step_bound_source: str | None = None
     """Evidence provenance when ``has_step_bound`` is True, e.g. ``"for-range"``,
     ``"counter-check"``, ``"recursion_limit"``."""

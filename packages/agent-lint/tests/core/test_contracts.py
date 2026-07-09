@@ -61,7 +61,7 @@ class TestRuleContextHasNoIOSurface:
 
 class TestRuleContextAccessors:
     def test_exposes_fragment_contents(self) -> None:
-        agent = Agent(span=_span(), name="loop", has_step_bound=False)
+        agent = Agent(span=_span(), name="loop", has_step_bound=False, structural_hash="h")
         fragment = IRFragment(file="agent/loop.py", agents=(agent,))
         ctx = RuleContext(_fragment=fragment, _config=default_config())
         assert ctx.file == "agent/loop.py"
@@ -131,7 +131,7 @@ def test_toy_rule_produces_findings_deterministically() -> None:
     rule = _ToyRule()
     fragment = IRFragment(
         file="a.py",
-        agents=(Agent(span=_span(), name=None, has_step_bound=False),),
+        agents=(Agent(span=_span(), name=None, has_step_bound=False, structural_hash="h"),),
     )
     ctx = RuleContext(_fragment=fragment, _config=default_config())
     first = list(rule.evaluate(ctx))
@@ -145,7 +145,13 @@ def test_toy_rule_is_silent_on_bounded_agent() -> None:
     fragment = IRFragment(
         file="a.py",
         agents=(
-            Agent(span=_span(), name=None, has_step_bound=True, step_bound_source="for-range"),
+            Agent(
+                span=_span(),
+                name=None,
+                has_step_bound=True,
+                structural_hash="h",
+                step_bound_source="for-range",
+            ),
         ),
     )
     ctx = RuleContext(_fragment=fragment, _config=default_config())

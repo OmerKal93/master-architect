@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "agent-lint"
-version = "0.0.0.dev0"
+version = "0.1.0"
 description = "Local-first static analyzer for AI agent reliability and security anti-patterns."
 readme = "README.md"
 license = "Apache-2.0"
@@ -14,7 +14,7 @@ authors = [
 ]
 keywords = ["ai-agents", "static-analysis", "reliability", "security", "langgraph", "sarif"]
 classifiers = [
-    "Development Status :: 2 - Pre-Alpha",
+    "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: Apache Software License",
     "Operating System :: OS Independent",
@@ -28,7 +28,11 @@ classifiers = [
 ]
 dependencies = [
     "pyyaml>=6.0",
+    "typer>=0.12",
 ]
+
+[project.scripts]
+agent-lint = "agent_reliability.lint.cli:main"
 
 [project.urls]
 Homepage = "https://github.com/OmerKal93/master-architect"

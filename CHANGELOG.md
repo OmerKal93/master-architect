@@ -6,6 +6,11 @@ release cadence justifies automation (see `EXECUTION.md`, deferred: full release
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-07-09
+
+The first installable proof: `pip install agent-lint`, then `agent-lint scan .` finds a real
+unbounded agent loop, entirely offline. Implements `EXECUTION.md` E01–E04.
+
 ### Added
 
 - Repository bootstrap: license (Apache-2.0), community docs (SECURITY, CONTRIBUTING,
@@ -24,3 +29,17 @@ release cadence justifies automation (see `EXECUTION.md`, deferred: full release
   See `docs/architecture/what-the-analyzer-sees.md` for the honest capability statement, and
   `fixtures/malicious/` / `fixtures/frontends/` for the hostile-input and golden-IR fixture
   corpora. (E03)
+- The `agent-lint scan [PATH]` CLI with a stable exit-code contract (0 clean / 1 findings /
+  2 usage error / 3 internal error / 4 partial scan) and terminal-escape-safe text output.
+  **AR001 — Agent loop has no maximum step count**, the first rule: see
+  `packages/agent-lint/src/agent_reliability/lint/rules/ar001/docs.md` for what it detects and
+  its documented limits. The rule fixture harness (`tools/art_rule_test.py`) that will gate
+  every future rule, with its first fixtures at `fixtures/rules/AR001/`. See
+  `docs/quickstart.md` for the full walkthrough. (E04)
+
+### Known limitations
+
+- Only one rule (AR001) exists; more land in `EXECUTION.md` E05 onward.
+- Only text output; JSON and SARIF land in E06.
+- No suppressions, baselines, or `explain` yet; land in E07/E13.
+- No framework awareness (LangGraph, MCP, n8n) yet; LangGraph recognition lands in E08.

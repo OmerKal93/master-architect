@@ -34,7 +34,7 @@ from __future__ import annotations
 import ast
 
 from agent_reliability.core.model.ir import Agent
-from agent_reliability.lint.frontend.ast_utils import dotted_name, span_of
+from agent_reliability.lint.frontend.ast_utils import dotted_name, span_of, structural_hash
 
 _BOUND_COMPARISON_OPS = (ast.GtE, ast.Gt, ast.Eq)
 
@@ -95,6 +95,7 @@ def detect_agents(tree: ast.Module, *, relative_path: str) -> tuple[Agent, ...]:
                     span=span_of(node, relative_path=relative_path),
                     name=None,
                     has_step_bound=has_bound,
+                    structural_hash=structural_hash(node),
                     step_bound_source=source,
                 )
             )
@@ -105,6 +106,7 @@ def detect_agents(tree: ast.Module, *, relative_path: str) -> tuple[Agent, ...]:
                     span=span_of(node, relative_path=relative_path),
                     name=node.name,
                     has_step_bound=has_bound,
+                    structural_hash=structural_hash(node),
                     step_bound_source=source,
                 )
             )
