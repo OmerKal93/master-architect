@@ -6,8 +6,8 @@ Thanks for your interest. This project is early — see `README.md` for the two-
 ## Contributor onboarding (should take under 30 minutes)
 
 ```bash
-git clone <this repo>
-cd master-architect/packages/agent-lint
+git clone https://github.com/OmerKal93/agent-reliability-toolkit.git
+cd agent-reliability-toolkit/packages/agent-lint
 uv sync                      # installs the package + dev dependencies
 uv run pytest                # should be green with zero network access
 uv run agent-lint scan fixtures/rules/AR001/unsafe   # once AR001 exists (E04+)
