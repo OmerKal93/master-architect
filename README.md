@@ -48,8 +48,8 @@ Runs entirely offline — no account, no API key, no network access. See
 ## Development
 
 ```bash
-git clone <this repo>
-cd master-architect/packages/agent-lint
+git clone https://github.com/OmerKal93/agent-reliability-toolkit.git
+cd agent-reliability-toolkit/packages/agent-lint
 uv sync --dev
 uv run pytest
 uv run agent-lint scan ../../fixtures/rules/AR001/unsafe
