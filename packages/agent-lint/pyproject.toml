@@ -35,8 +35,8 @@ dependencies = [
 agent-lint = "agent_reliability.lint.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/OmerKal93/master-architect"
-Issues = "https://github.com/OmerKal93/master-architect/issues"
+Homepage = "https://github.com/OmerKal93/agent-reliability-toolkit"
+Issues = "https://github.com/OmerKal93/agent-reliability-toolkit/issues"
 
 [project.optional-dependencies]
 dev = [
