@@ -1,0 +1,18 @@
+{
+  "target_path": "C:\\Users\\9D8E~1\\AppData\\Local\\Temp\\harnesskit-workspace\\agent-reliability-toolkit",
+  "stack_language": "python",
+  "package_root": "packages\\agent-lint",
+  "doc_precedence": [
+    "EXECUTION.md",
+    "PLAN.md",
+    "PLAN-PRS.md",
+    "CODEX_HANDOFF.md",
+    "CONTRIBUTING.md",
+    "PLAN.md"
+  ],
+  "git_branch": "claude/read-and-plan-2an34e",
+  "git_head": "3953f8b0c31d8cd3d8cf19445edb34fc203b00bc",
+  "ci_workflow_count": 2,
+  "sensitive_path_count": 0,
+  "generated_at": "2026-07-10T18:29:39.149Z"
+}

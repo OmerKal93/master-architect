@@ -30,6 +30,7 @@ def _extract_timeout(call: ast.Call, *, relative_path: str) -> TimeoutPolicy:
         if kw.arg != "timeout":
             continue
         seconds: float | None = None
+        explicit_none = isinstance(kw.value, ast.Constant) and kw.value.value is None
         if (
             isinstance(kw.value, ast.Constant)
             and isinstance(kw.value.value, (int, float))
@@ -37,7 +38,10 @@ def _extract_timeout(call: ast.Call, *, relative_path: str) -> TimeoutPolicy:
         ):
             seconds = float(kw.value.value)
         return TimeoutPolicy(
-            span=span_of(call, relative_path=relative_path), present=True, seconds=seconds
+            span=span_of(call, relative_path=relative_path),
+            present=True,
+            seconds=seconds,
+            explicit_none=explicit_none,
         )
     return TimeoutPolicy(span=span_of(call, relative_path=relative_path), present=False)
 

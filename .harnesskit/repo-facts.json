@@ -1,0 +1,45 @@
+[
+  {
+    "fact": "target_path_exists",
+    "value": true,
+    "source": "fs.existsSync",
+    "confidence": "high"
+  },
+  {
+    "fact": "package_roots_found",
+    "value": 1,
+    "source": "recursive scan for pyproject.toml/package.json (depth<=4)",
+    "confidence": "high"
+  },
+  {
+    "fact": "package_manager",
+    "value": "uv",
+    "source": "uv.lock present",
+    "confidence": "high"
+  },
+  {
+    "fact": "doc_precedence",
+    "value": [
+      "EXECUTION.md",
+      "PLAN.md",
+      "PLAN-PRS.md",
+      "CODEX_HANDOFF.md",
+      "CONTRIBUTING.md",
+      "PLAN.md"
+    ],
+    "source": "AGENTS.md's own declared \"precedence\" section",
+    "confidence": "high"
+  },
+  {
+    "fact": "git_repo",
+    "value": true,
+    "source": "git rev-parse HEAD",
+    "confidence": "high"
+  },
+  {
+    "fact": "ci_workflows_count",
+    "value": 2,
+    "source": ".github/workflows/ listing",
+    "confidence": "high"
+  }
+]

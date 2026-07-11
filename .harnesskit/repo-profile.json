@@ -1,0 +1,74 @@
+{
+  "target_path": "C:\\Users\\9D8E~1\\AppData\\Local\\Temp\\harnesskit-workspace\\agent-reliability-toolkit",
+  "package_root": "packages\\agent-lint",
+  "stack": {
+    "language": "python",
+    "confidence": "high",
+    "evidence": [
+      "pyproject.toml at ..\\..\\..\\9D8E~1\\AppData\\Local\\Temp\\harnesskit-workspace\\agent-reliability-toolkit\\packages\\agent-lint\\pyproject.toml"
+    ],
+    "commands": {
+      "test": {
+        "command": "uv run pytest",
+        "source": "[tool.pytest] in pyproject.toml (or pytest.ini)",
+        "confidence": "high"
+      },
+      "lint": {
+        "command": "uv run ruff check .",
+        "source": "[tool.ruff] in pyproject.toml",
+        "confidence": "high"
+      },
+      "typecheck": {
+        "command": "uv run mypy src",
+        "source": "[tool.mypy] in pyproject.toml, target dir detected via 'src/' directory presence",
+        "confidence": "high"
+      },
+      "build": {
+        "command": "uv run python -m build",
+        "source": "[build-system] declared in pyproject.toml",
+        "confidence": "medium"
+      }
+    }
+  },
+  "commands": {
+    "test": {
+      "command": "uv run pytest",
+      "source": "[tool.pytest] in pyproject.toml (or pytest.ini)",
+      "confidence": "high"
+    },
+    "lint": {
+      "command": "uv run ruff check .",
+      "source": "[tool.ruff] in pyproject.toml",
+      "confidence": "high"
+    },
+    "typecheck": {
+      "command": "uv run mypy src",
+      "source": "[tool.mypy] in pyproject.toml, target dir detected via 'src/' directory presence",
+      "confidence": "high"
+    },
+    "build": {
+      "command": "uv run python -m build",
+      "source": "[build-system] declared in pyproject.toml",
+      "confidence": "medium"
+    }
+  },
+  "ci_workflows": [
+    ".github\\workflows\\ci.yml",
+    ".github\\workflows\\release.yml"
+  ],
+  "doc_precedence": [
+    "EXECUTION.md",
+    "PLAN.md",
+    "PLAN-PRS.md",
+    "CODEX_HANDOFF.md",
+    "CONTRIBUTING.md",
+    "PLAN.md"
+  ],
+  "git": {
+    "branch": "claude/read-and-plan-2an34e",
+    "head": "3953f8b0c31d8cd3d8cf19445edb34fc203b00bc",
+    "dirty": true,
+    "remote": "https://github.com/OmerKal93/agent-reliability-toolkit.git"
+  },
+  "generated_at": "2026-07-10T18:29:39.149Z"
+}

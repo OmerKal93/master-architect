@@ -1,0 +1,55 @@
+{
+  "edge/hand_rolled_counter_retry.py": [],
+  "edge/bare_unqualified_retry.py": [],
+  "edge/bare_unqualified_retry_call.py": [],
+  "safe/manual_for_range_retry.py": [],
+  "safe/tenacity_bounded.py": [],
+  "safe/tenacity_qualified_stop_after_attempt.py": [],
+  "safe/tenacity_unrelated_stop_after_attempt.py": [],
+  "unsafe/manual_while_true_retry.py": [
+    {
+      "category": "loop-safety",
+      "confidence": "high",
+      "rule_id": "AR001",
+      "severity": "high"
+    },
+    {
+      "category": "retry-safety",
+      "confidence": "high",
+      "rule_id": "AR014",
+      "severity": "high"
+    }
+  ],
+  "unsafe/tenacity_missing_stop.py": [
+    {
+      "category": "retry-safety",
+      "confidence": "high",
+      "rule_id": "AR014",
+      "severity": "high"
+    }
+  ],
+  "unsafe/tenacity_explicit_stop_none.py": [
+    {
+      "category": "retry-safety",
+      "confidence": "high",
+      "rule_id": "AR014",
+      "severity": "high"
+    }
+  ],
+  "unsafe/tenacity_bare_decorator_qualified.py": [
+    {
+      "category": "retry-safety",
+      "confidence": "high",
+      "rule_id": "AR014",
+      "severity": "high"
+    }
+  ],
+  "unsafe/tenacity_qualified_empty_call.py": [
+    {
+      "category": "retry-safety",
+      "confidence": "high",
+      "rule_id": "AR014",
+      "severity": "high"
+    }
+  ]
+}

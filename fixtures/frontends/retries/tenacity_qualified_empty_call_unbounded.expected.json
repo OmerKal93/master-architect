@@ -1,0 +1,18 @@
+{
+  "agents": [],
+  "diagnostic_count": 0,
+  "retry_policies": [
+    {
+      "bound": "unbounded",
+      "max_attempts": null,
+      "source": "tenacity"
+    }
+  ],
+  "tool_calls": [
+    {
+      "callee": "tenacity.retry",
+      "timeout_present": false,
+      "timeout_seconds": null
+    }
+  ]
+}

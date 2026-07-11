@@ -1,0 +1,55 @@
+{
+  "edge/unrecognized_callee_no_timeout.py": [],
+  "safe/openai_audio_transcription_with_timeout.py": [],
+  "safe/anthropic_messages_with_timeout.py": [],
+  "safe/requests_post_with_timeout.py": [],
+  "safe/openai_chat_completion_timeout_none_unverified.py": [],
+  "unsafe/openai_chat_completion_no_timeout.py": [
+    {
+      "category": "timeouts",
+      "confidence": "high",
+      "rule_id": "AR003",
+      "severity": "high"
+    }
+  ],
+  "unsafe/anthropic_messages_create_no_timeout.py": [
+    {
+      "category": "timeouts",
+      "confidence": "low",
+      "rule_id": "AR003",
+      "severity": "high"
+    }
+  ],
+  "unsafe/requests_post_no_timeout.py": [
+    {
+      "category": "timeouts",
+      "confidence": "high",
+      "rule_id": "AR003",
+      "severity": "high"
+    }
+  ],
+  "unsafe/requests_post_timeout_none.py": [
+    {
+      "category": "timeouts",
+      "confidence": "high",
+      "rule_id": "AR003",
+      "severity": "high"
+    }
+  ],
+  "unsafe/notification_service_short_suffix_collision.py": [
+    {
+      "category": "timeouts",
+      "confidence": "low",
+      "rule_id": "AR003",
+      "severity": "high"
+    }
+  ],
+  "unsafe/known_false_positive_client_level_timeout.py": [
+    {
+      "category": "timeouts",
+      "confidence": "high",
+      "rule_id": "AR003",
+      "severity": "high"
+    }
+  ]
+}

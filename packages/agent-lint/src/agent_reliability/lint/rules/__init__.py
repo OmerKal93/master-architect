@@ -11,7 +11,9 @@ from __future__ import annotations
 
 from agent_reliability.core.contracts import Rule
 from agent_reliability.lint.rules.ar001 import RULE as AR001_RULE
+from agent_reliability.lint.rules.ar003 import RULE as AR003_RULE
+from agent_reliability.lint.rules.ar014 import RULE as AR014_RULE
 
-ALL_RULES: tuple[Rule, ...] = (AR001_RULE,)
+ALL_RULES: tuple[Rule, ...] = (AR001_RULE, AR003_RULE, AR014_RULE)
 
 __all__ = ["ALL_RULES"]

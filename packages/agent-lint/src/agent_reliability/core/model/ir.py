@@ -67,6 +67,13 @@ class TimeoutPolicy:
     """Set only when a literal timeout value was found; a non-literal timeout (e.g. a variable
     or config lookup) is ``present=True`` with ``seconds=None`` — present but not statically
     known, which is a distinct, weaker form of evidence than an absent timeout."""
+    explicit_none: bool = False
+    """``True`` only when the timeout keyword's literal value is ``None`` (e.g. ``timeout=None``).
+    For ``requests``/``httpx``, an explicit ``None`` disables the timeout entirely — the call is
+    exactly as unbounded as if the keyword were never passed, so this is distinct evidence from
+    ``present=True, seconds=None`` (timeout present but bound to a variable/config lookup, which
+    is potentially a real bound this analysis just can't read statically). AR003 (E05) treats
+    ``explicit_none=True`` the same as ``present=False``."""
 
 
 @dataclass(frozen=True, slots=True)
