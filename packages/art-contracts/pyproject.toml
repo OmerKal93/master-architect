@@ -1,0 +1,32 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "art-contracts"
+version = "0.0.1"
+description = "ART-0 vertical slice: at-most-once behavioral contracts checked against fault-injected LangGraph agent traces. Not yet published; local-only ART-0 spike."
+readme = "README.md"
+license = "Apache-2.0"
+requires-python = ">=3.11,<3.13"
+authors = [
+    { name = "Agent Reliability Toolkit Contributors" },
+]
+classifiers = [
+    "Development Status :: 2 - Pre-Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+]
+dependencies = [
+    "agent-chaos==0.1.3",
+    "langgraph>=0.2,<0.3",
+    "langchain-anthropic>=0.2,<0.3",
+    "pytest>=8.0",
+]
+
+[project.entry-points.pytest11]
+art_contracts = "art_contracts.pytest_plugin"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/art_contracts"]
