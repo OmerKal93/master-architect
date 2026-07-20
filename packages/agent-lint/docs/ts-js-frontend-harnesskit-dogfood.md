@@ -209,3 +209,50 @@ not worth a more elaborate lifecycle-management mechanism for ~10 test-only proc
 
 No new rules were added; both fixes widened/repaired existing AR001 logic and existing-frontend
 process-spawn overhead respectively. No routing/enablement changes anywhere in this pass.
+
+## Second-round independent review: the compound-condition fix was reverted
+
+A fresh-context reviewer (no authorship knowledge, dispatched during a later HarnessKit/ART
+cycle-close reconciliation) re-verified everything above and found 3 real issues. Two were fixed
+without changing behavior claims (a flaky worker-count test, and a real elapsed-time
+double-counting bug where a worker timeout's own wait time was charged against the fallback
+path's budget too, producing a spurious `scan-limit:` diagnostic on files that actually completed
+well within budget). The third finding required reverting a behavior claim made above:
+
+**The AR001 compound-condition fix (the "Gap closure" section's item 1) was a real false-negative
+regression, not just a widened true positive, and has been reverted.** Concrete counter-example
+the reviewer constructed and verified against the pre-revert code: `if client.is_broken() or
+SOME_UNRELATED_FLAG == 1: raise` (and the JS equivalent) reported `has_step_bound: True` --
+because `SOME_UNRELATED_FLAG == 1` is a real comparison, and the widened heuristic accepted *any*
+comparison anywhere in the `if` test, with no requirement that the comparison actually have
+anything to do with bounding loop iterations. Reverted `_test_contains_bound_comparison` /
+`testContainsBoundComparison` to the original, narrow form (the `if` test itself must be a direct
+comparison) in both languages. Kept the other half of the original fix (`raise`/`throw` as a
+valid exit alongside `break`/`return`), since that part carries no equivalent false-negative risk
+and was not flagged by either review round.
+
+**Consequence: `run-json-atomic.js`'s `retryOnContention` is a known, accepted false positive
+again**, exactly as it was before this dogfood run started -- the compound `||` condition
+(`!isContendedLockError(e) || Date.now() >= deadline`) is no longer recognized as a visible
+bound. This is the documented, philosophically-correct trade-off this rule already states
+elsewhere: a missed bound (silence) is the safer failure direction than inventing one, and there
+is no reliable syntactic way to tell "this comparison bounds the loop" from "this comparison
+merely happens to share a boolean expression with something else." The 2 regression fixtures
+added for the compound-condition case (`fixtures/rules/AR001/safe/
+harnesskit_pattern_retry_on_contention.{py,js}`) were removed, since they specifically tested the
+now-reverted behavior; a dedicated fixture for a documented, non-fixed false positive isn't
+useful. Two new tests were added instead (in both languages) proving the counter-example above no
+longer regresses, alongside the kept, narrower `raise`/`throw`-as-exit test.
+
+**Corrected real scan numbers** (re-run against `hk-worktrees/phase-a-v1-integration`, full repo,
+after the revert): **14 findings** (was 13), all AR001 -- the 13 already-documented true positives
+plus `run-json-atomic.js:97` (the known, accepted false positive, back as expected). Full fixture
+harness: **54/54** (was 56 -- the 2 removed fixtures). Full pytest: 227 passed (same 2
+pre-existing, diff-unrelated failures), `ruff check`/`ruff format --check`/`mypy src` all clean.
+Scan time unaffected by the revert (~2.2s, still far under the 60s budget -- the performance fix
+is independent of this correction).
+
+This correction is recorded here rather than silently rewriting the "Gap closure" section above,
+per this doc's own append-only convention -- the original section accurately describes what was
+believed and verified at the time; this section describes what a second, independent look found
+wrong with it.

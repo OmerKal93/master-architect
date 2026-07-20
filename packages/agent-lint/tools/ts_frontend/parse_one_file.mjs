@@ -142,24 +142,20 @@ const BOUND_BINARY_OPERATORS = new Set([
   ts.SyntaxKind.EqualsEqualsEqualsToken,
 ]);
 
-// Widened from an exact top-level BinaryExpression match: a compound condition such as
-// `!isContendedLockError(e) || Date.now() >= deadline` (a `||`-BinaryExpression wrapping the
-// real comparison) is just as much a visible bound as a bare `x >= MAX` -- the comparison is
-// still statically present, only nested one level deeper. Mirrors the same fix in loops.py
-// (`_test_contains_bound_comparison`) -- confirmed false positive against real HarnessKit code
-// (scripts/review-independence/run-json-atomic.js's retryOnContention) found via dogfood review.
+// Deliberately narrow: only a comparison that IS the if-test directly counts, matching the
+// original (pre-dogfood-session) behavior. A dogfood-review round briefly widened this to "any
+// comparison anywhere in the test tree" to recognize
+// `!isContendedLockError(e) || Date.now() >= deadline` -- but a second, independent review caught
+// that this was too permissive: `client.isBroken() || SOME_UNRELATED_FLAG === 1` would then also
+// read as bounded, even though the comparison has nothing to do with bounding iterations -- a
+// real false-negative regression on a genuinely unbounded loop, not just a widened true positive.
+// Reverted to this narrow form. The compound-condition shape above is a known, accepted false
+// positive again -- silence (a missed bound) is the safer failure direction than inventing one,
+// per this module's own stated philosophy, and there is no reliable syntactic way to tell "this
+// comparison bounds the loop" from "this comparison merely happens to share a boolean expression
+// with something else." Mirrors loops.py's `_test_contains_bound_comparison`.
 function testContainsBoundComparison(test) {
-  let found = false;
-  function visit(n) {
-    if (found) return;
-    if (ts.isBinaryExpression(n) && BOUND_BINARY_OPERATORS.has(n.operatorToken.kind)) {
-      found = true;
-      return;
-    }
-    n.forEachChild(visit);
-  }
-  visit(test);
-  return found;
+  return ts.isBinaryExpression(test) && BOUND_BINARY_OPERATORS.has(test.operatorToken.kind);
 }
 
 function hasVisibleStepBound(bodyNode) {

@@ -311,7 +311,15 @@ class TsJsFrontend:
         # since before the worker existed. Its error handling is the single source of truth for
         # every toolchain-failure diagnostic (including the SCAN_LIMIT_PREFIX fixes from the
         # earlier independent review) -- the worker never re-derives that wording.
-        return self._lower_single_shot(path, source, relative_path=relative_path, start=start)
+        #
+        # Caught by independent review: `start` must NOT be reused here. It was captured before
+        # the worker attempt, which may itself have consumed real wall time (a timeout is the
+        # documented case) before falling back -- reusing it would charge the fallback's own,
+        # genuinely fast completion against a budget that already includes the failed worker
+        # attempt's time, producing a spurious `SCAN_LIMIT_PREFIX` diagnostic on a file that
+        # actually completed well within budget. `_lower_single_shot` captures its own fresh
+        # `start` instead.
+        return self._lower_single_shot(path, source, relative_path=relative_path)
 
     def _parse_via_worker(self, path: Path, source: str) -> dict[str, Any] | None:
         if self._worker is None:
@@ -322,9 +330,10 @@ class TsJsFrontend:
             _script_kind_for(path), source, timeout=self._limits.per_file_time_budget_seconds
         )
 
-    def _lower_single_shot(
-        self, path: Path, source: str, *, relative_path: str, start: float
-    ) -> IRFragment:
+    def _lower_single_shot(self, path: Path, source: str, *, relative_path: str) -> IRFragment:
+        # Fresh start time for this attempt only -- see the caller's comment in lower() for why
+        # reusing a pre-worker-attempt timestamp here was a real, independent-review-caught bug.
+        start = time.monotonic()
         try:
             proc = subprocess.run(
                 [

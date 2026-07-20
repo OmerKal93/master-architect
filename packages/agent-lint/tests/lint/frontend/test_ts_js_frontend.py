@@ -29,10 +29,17 @@ class TestWorkerReuse:
 
     def test_one_process_is_reused_across_multiple_files(self, tmp_path: Path, monkeypatch) -> None:
         real_popen = subprocess.Popen
-        popen_calls: list[list[str]] = []
+        worker_spawns: list[list[str]] = []
 
         def counting_popen(cmd, *args, **kwargs):
-            popen_calls.append(cmd)
+            # Filter to worker spawns only (argv contains "--serve"): a real independent-review
+            # finding on an earlier version of this test was that subprocess.run() -- used by the
+            # single-shot fallback path -- also calls Popen internally, so an unfiltered count
+            # could spuriously inflate (and flake) if a worker attempt ever falls back for real
+            # timing reasons during the test. This test is specifically about worker *reuse*, so
+            # it must only count worker spawns, not incidental fallback subprocess launches.
+            if "--serve" in cmd:
+                worker_spawns.append(cmd)
             return real_popen(cmd, *args, **kwargs)
 
         monkeypatch.setattr(subprocess, "Popen", counting_popen)
@@ -45,17 +52,17 @@ class TestWorkerReuse:
             assert fragment.diagnostics == ()
             assert len(fragment.agents) == 1
 
-        assert len(popen_calls) == 1
-        assert popen_calls[0][2] == "--serve"
+        assert len(worker_spawns) == 1
 
     def test_two_frontend_instances_use_two_workers(self, tmp_path: Path, monkeypatch) -> None:
         # Reuse is per-instance, not a hidden global: a fresh TsJsFrontend must not silently
         # share (or leak) another instance's worker process.
         real_popen = subprocess.Popen
-        popen_calls: list[list[str]] = []
+        worker_spawns: list[list[str]] = []
 
         def counting_popen(cmd, *args, **kwargs):
-            popen_calls.append(cmd)
+            if "--serve" in cmd:  # see comment in the test above
+                worker_spawns.append(cmd)
             return real_popen(cmd, *args, **kwargs)
 
         monkeypatch.setattr(subprocess, "Popen", counting_popen)
@@ -65,7 +72,36 @@ class TestWorkerReuse:
         TsJsFrontend().lower(f, root=tmp_path)
         TsJsFrontend().lower(f, root=tmp_path)
 
-        assert len(popen_calls) == 2
+        assert len(worker_spawns) == 2
+
+    def test_worker_timeout_then_fast_fallback_produces_no_spurious_scan_limit_diagnostic(
+        self, tmp_path: Path
+    ) -> None:
+        # Regression test for a bug caught by independent review: `start` was captured once
+        # before the worker attempt and reused unchanged by the fallback path's own elapsed-time
+        # check -- any worker failure that consumed real time before falling back (a timeout is
+        # the documented case) got counted against the same per-file budget the fallback's own,
+        # genuinely fast completion was judged against, producing a spurious SCAN_LIMIT_PREFIX
+        # diagnostic on a file that actually completed well within budget.
+        fake_script = tmp_path / "fake_parser.mjs"
+        fake_script.write_text(
+            "const mode = process.argv[2];\n"
+            "if (mode === '--serve') {\n"
+            "  // Hang forever, never respond -- simulates a stuck/slow worker.\n"
+            "} else {\n"
+            "  process.stdout.write(JSON.stringify("
+            "{ok: true, node_count: 1, agents: [], tool_calls: [], retry_policies: []}));\n"
+            "}\n"
+        )
+        f = tmp_path / "a.js"
+        f.write_text("var x = 1;\n")
+        frontend = TsJsFrontend(
+            limits=ScanLimits(per_file_time_budget_seconds=1.0), script_path=fake_script
+        )
+
+        fragment = frontend.lower(f, root=tmp_path)
+
+        assert fragment.diagnostics == ()
 
 
 class TestToolchainFailuresAreScanLimitConditions:
@@ -169,11 +205,17 @@ class TestRealParsing:
         assert len(fragment.retry_policies) == 1
         assert fragment.retry_policies[0].bound.value == "unbounded"
 
-    def test_compound_condition_with_throw_exit_is_a_visible_bound(self, tmp_path: Path) -> None:
-        # Regression test for a false positive caught by independent dogfood review against real
-        # HarnessKit code: scripts/review-independence/run-json-atomic.js's retryOnContention()
-        # -- a compound `||` condition wrapping a comparison, exiting via `throw`, was not
-        # recognized as a visible step bound. See parse_one_file.mjs's testContainsBoundComparison.
+    def test_compound_condition_is_a_known_accepted_false_positive_again(
+        self, tmp_path: Path
+    ) -> None:
+        # A compound `||` condition wrapping a real comparison was briefly recognized as a visible
+        # bound (to fix a confirmed false positive against real HarnessKit code:
+        # scripts/review-independence/run-json-atomic.js's retryOnContention()) -- but a second,
+        # independent review caught that this was a real false-negative regression on genuinely
+        # unbounded loops (see test_direct_comparison_with_throw_exit_is_still_a_visible_bound and
+        # loops.py's _test_contains_bound_comparison for the counter-example and full rationale).
+        # Reverted: this shape is a known, accepted false positive again, not a bug in the
+        # reverted heuristic.
         f = tmp_path / "a.js"
         f.write_text(
             "function retryOnContention(fn, deadline) {\n"
@@ -190,12 +232,34 @@ class TestRealParsing:
         fragment = TsJsFrontend().lower(f, root=tmp_path)
 
         assert len(fragment.agents) == 1
+        assert fragment.agents[0].has_step_bound is False
+
+    def test_direct_comparison_with_throw_exit_is_still_a_visible_bound(
+        self, tmp_path: Path
+    ) -> None:
+        # The part of the original widening that IS kept: `throw` (like Python `raise`) is a
+        # valid loop exit alongside `break`/`return`, for a DIRECT (non-compound) comparison --
+        # this carries no false-negative risk, unlike the compound-condition case above.
+        f = tmp_path / "a.js"
+        f.write_text(
+            "function runAgent(client, maxSteps) {\n"
+            "  let steps = 0;\n"
+            "  while (true) {\n"
+            "    client.step();\n"
+            "    steps++;\n"
+            "    if (steps >= maxSteps) throw new Error('done');\n"
+            "  }\n"
+            "}\n"
+        )
+        fragment = TsJsFrontend().lower(f, root=tmp_path)
+
+        assert len(fragment.agents) == 1
         assert fragment.agents[0].has_step_bound is True
         assert fragment.agents[0].step_bound_source == "counter-check"
 
     def test_compound_condition_with_no_comparison_is_still_unbounded(self, tmp_path: Path) -> None:
         # A compound condition with no relational comparison anywhere is correctly still
-        # unbounded -- the widened heuristic must not start treating every `if` as a bound.
+        # unbounded.
         f = tmp_path / "a.js"
         f.write_text(
             "function runAgent(client, flagA, flagB) {\n"
