@@ -90,7 +90,7 @@ REMEDIATION = (
     "`{ timeout: ... }` option, or a library-specific timeout object, depending on the "
     "language/library). Configuring a timeout on the client/session instead does make the call "
     "genuinely safe, but this rule cannot see that and will keep reporting the finding "
-    "regardless -- see docs.md's \"Known limitation\" section."
+    'regardless -- see docs.md\'s "Known limitation" section.'
 )
 
 # Module-qualified HTTP client calls: the textual callee itself names the library (e.g.
@@ -211,7 +211,10 @@ def _evidence_for(tool_call: ToolCall) -> str:
     # "timeout=" keyword-argument phrasing is Python-specific and reads as wrong for a JS/TS
     # finding (whose timeout idiom is a `{ timeout: ... }` object property).
     if tool_call.timeout is not None and tool_call.timeout.explicit_none:
-        return f"{tool_call.callee}(...) has an explicit null timeout, which disables the timeout entirely"
+        return (
+            f"{tool_call.callee}(...) has an explicit null timeout, which disables the timeout "
+            "entirely"
+        )
     return f"{tool_call.callee}(...) has no visible timeout configuration"
 
 

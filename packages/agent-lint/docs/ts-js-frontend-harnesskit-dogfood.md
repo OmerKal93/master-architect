@@ -139,3 +139,73 @@ a licensing concern.
 All 54 fixture cases and the full pytest suite (218 passed, plus the 2 pre-existing,
 diff-unrelated failures already disclosed above) were re-verified green after applying the F1-F4
 fixes.
+
+## Gap closure (2026-07-20): the confirmed FP and F6 are both fixed
+
+The two open items this doc named above -- the `run-json-atomic.js:97` false positive and F6's
+scan-limit truncation risk -- were both real bugs, not permanent limitations, and are now fixed.
+
+**1. AR001 compound-condition + `throw`-as-exit false positive -- FIXED.** Root cause:
+`_has_visible_step_bound` (`loops.py`) / `hasVisibleStepBound` (`parse_one_file.mjs`) only
+recognized a bare `if <comparison>: break/return` -- a compound condition
+(`if not is_contended(e) or time.time() >= deadline: raise`) was invisible to it on two counts:
+the comparison was nested inside a `BoolOp`/`||`-expression rather than being the `if` test
+directly, and the exit was a `raise`/`throw`, not a `break`/`return`. Fixed in both languages
+identically: the test-expression check now searches the whole condition tree for a qualifying
+comparison (`_test_contains_bound_comparison` / `testContainsBoundComparison`), and `raise`/
+`throw` are now accepted exits alongside `break`/`return`. Verified the fix does NOT overcorrect:
+a compound condition with no relational comparison anywhere (e.g. `if flagA || flagB: log(...)`)
+is still correctly reported as unbounded -- covered by a dedicated negative test in both
+languages. Regression fixtures added:
+`fixtures/rules/AR001/safe/harnesskit_pattern_retry_on_contention.{py,js}` (real HarnessKit
+shape, inspired by `run-json-atomic.js`'s `retryOnContention`), plus unit tests in
+`test_python_frontend.py` and `test_ts_js_frontend.py`. Full fixture harness: **56/56** (was 54).
+Full pytest: **224 passed** (was 219), same 2 pre-existing, diff-unrelated failures, zero
+regressions.
+
+**2. F6 (full-repo scan hitting the wall-clock budget) -- FIXED.** Root cause was architectural,
+not a tuning problem: a fresh `node parse_one_file.mjs` process was spawned per file, and Node
+startup + `require('typescript')` (a large module) measured at ~290ms/file dominates real parse
+time for a typical file -- on a repo with hundreds of JS/TS files that overhead alone exceeded
+the 60s whole-scan budget. Fixed without touching any detection logic: `parse_one_file.mjs`
+gained an additive `--serve` mode (a persistent process that reads newline-delimited JSON
+requests from stdin and writes one newline-delimited JSON response per file, reusing its already
+-loaded `typescript` module across the whole scan; the pre-existing single-shot mode is
+byte-for-byte unchanged and both modes share the same `parseOne()` parsing function, so results
+are identical either way). `ts_js_frontend.py` gained a `_TsJsWorker` that lazily starts and
+reuses one `--serve` subprocess per `TsJsFrontend` instance, with a background reader thread and
+a timeout matching the existing per-file time budget; on ANY worker failure (missing Node,
+crashed process, timeout, malformed response, protocol desync) it returns `None` and `lower()`
+falls straight back to the original one-process-per-file `subprocess.run()` path, which is
+unchanged since before the worker existed and remains the single source of truth for every
+toolchain-failure diagnostic (including the F1 `SCAN_LIMIT_PREFIX` fixes). Real before/after,
+same target used to find F6 originally (`hk-worktrees/phase-a-v1-integration`, full repo, no
+scoping): **before, hit the 60s scan-limit budget with files left unscanned; after, completes
+cleanly in ~6.1s.** Verified reuse is real, not assumed: a new regression test
+(`TestWorkerReuse`) monkeypatches `subprocess.Popen` and asserts exactly one process is spawned
+across 5 `lower()` calls on one `TsJsFrontend` instance, and exactly two across two separate
+instances (reuse is per-instance, never a hidden global). Known, disclosed trade-off: pytest
+itself constructs ~10 fresh `TsJsFrontend()` instances across the test suite, each lazily
+spawning its own worker if it reaches real source content; these are cleaned up via `atexit`
+(registered once per instance) rather than an explicit per-scan close, so in the worst case a few
+worker processes linger until the pytest process itself exits -- acceptable given the real
+(single-instance-per-scan) usage in `scan.py` and `art_rule_test.py` never hits this at all, and
+not worth a more elaborate lifecycle-management mechanism for ~10 test-only processes.
+
+**3. Full re-scan after both fixes, both real HarnessKit trees:**
+
+- `hk-worktrees/phase-a-v1-integration` (full repo, untruncated this time): **13 findings**, down
+  from the prior truncated run's 11 (which had already missed files) and the scoped
+  `scripts/`+`evals/` run's 14 (which included the now-fixed false positive). All 13 are AR001,
+  all the same already-documented true-positive class (unguarded recursive directory-walkers/
+  validators -- `walk`, `copyDirRecursive`, `rmRecursive`, `listFilesRecursive`,
+  `validateAgainstSchema`). `run-json-atomic.js` no longer appears anywhere in the results --
+  confirmed fixed, not just fixed-in-isolation. **Zero false positives remain in this scan.**
+- `C:/Dev/HarnessKit` (`hk/batch1-integration`, full repo): **9 findings**, unchanged from the
+  original run (this branch's `run-json-atomic.js` never had the compound-condition shape to
+  begin with -- its bound check is the simpler `if (Date.now() >= deadline) return` form, which
+  was already correctly classified as bounded before this fix). Consistency check, not a new
+  finding.
+
+No new rules were added; both fixes widened/repaired existing AR001 logic and existing-frontend
+process-spawn overhead respectively. No routing/enablement changes anywhere in this pass.

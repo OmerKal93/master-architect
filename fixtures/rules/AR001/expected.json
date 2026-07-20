@@ -9,6 +9,8 @@
   "safe/while_true_with_bound.js": [],
   "safe/while_true_with_bound.ts": [],
   "safe/harnesskit_pattern_dispatch_poll_with_deadline.js": [],
+  "safe/harnesskit_pattern_retry_on_contention.py": [],
+  "safe/harnesskit_pattern_retry_on_contention.js": [],
   "unsafe/recursive_no_bound.py": [
     {
       "category": "loop-safety",

@@ -56,17 +56,34 @@ def _contains_call(body: list[ast.stmt]) -> bool:
     return False
 
 
+def _test_contains_bound_comparison(test: ast.expr) -> bool:
+    # Widened from an exact top-level `ast.Compare` match: a compound condition such as
+    # `if not is_contended(e) or time.time() >= deadline:` (an `ast.BoolOp` wrapping the real
+    # comparison) is just as much a visible bound as a bare `if x >= MAX:` -- the comparison is
+    # still statically present, only nested one level deeper. Found via independent dogfood
+    # review: this exact shape (JS `!isContendedLockError(e) || Date.now() >= deadline`) was a
+    # confirmed false positive against real HarnessKit code.
+    for node in ast.walk(test):
+        if isinstance(node, ast.Compare) and any(
+            isinstance(op, _BOUND_COMPARISON_OPS) for op in node.ops
+        ):
+            return True
+    return False
+
+
 def _has_visible_step_bound(body: list[ast.stmt]) -> tuple[bool, str | None]:
     for stmt in body:
         for child in ast.walk(stmt):
             if not isinstance(child, ast.If):
                 continue
-            test = child.test
-            if not isinstance(test, ast.Compare):
+            if not _test_contains_bound_comparison(child.test):
                 continue
-            if not any(isinstance(op, _BOUND_COMPARISON_OPS) for op in test.ops):
-                continue
-            has_exit = any(isinstance(inner, (ast.Break, ast.Return)) for inner in ast.walk(child))
+            # `raise` (mirrors JS `throw`) is a valid loop exit alongside `break`/`return`: it
+            # propagates out of the loop exactly as those do. Same dogfood finding as above --
+            # the confirmed false positive's exit was `throw e`, not `break`/`return`.
+            has_exit = any(
+                isinstance(inner, (ast.Break, ast.Return, ast.Raise)) for inner in ast.walk(child)
+            )
             if has_exit:
                 return True, "counter-check"
     return False, None

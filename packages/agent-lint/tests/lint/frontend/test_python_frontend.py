@@ -98,6 +98,48 @@ class TestUnreadableFile:
         assert len(fragment.diagnostics) == 1
 
 
+class TestStepBoundHeuristic:
+    """Regression tests for a false positive caught by independent dogfood review against real
+    HarnessKit code (scripts/review-independence/run-json-atomic.js's retryOnContention()): a
+    compound-condition `if` test (`ast.BoolOp` wrapping a `Compare`) and a `raise`-based exit
+    were not recognized as a visible step bound. See loops.py's `_test_contains_bound_comparison`.
+    """
+
+    def test_compound_condition_with_raise_exit_is_a_visible_bound(self, tmp_path: Path) -> None:
+        f = tmp_path / "a.py"
+        f.write_text(
+            "def retry_on_contention(fn, deadline):\n"
+            "    while True:\n"
+            "        try:\n"
+            "            return fn()\n"
+            "        except Exception as e:\n"
+            "            if not is_contended(e) or time.time() >= deadline:\n"
+            "                raise\n"
+            "            sleep(0.05)\n"
+        )
+        fragment = PythonFrontend().lower(f, root=tmp_path)
+
+        assert len(fragment.agents) == 1
+        assert fragment.agents[0].has_step_bound is True
+        assert fragment.agents[0].step_bound_source == "counter-check"
+
+    def test_compound_condition_with_no_comparison_is_still_unbounded(self, tmp_path: Path) -> None:
+        # A compound condition with no relational comparison anywhere is correctly still
+        # unbounded -- the widened heuristic must not start treating every `if` as a bound.
+        f = tmp_path / "a.py"
+        f.write_text(
+            "def run_agent(client, flag_a, flag_b):\n"
+            "    while True:\n"
+            "        client.step()\n"
+            "        if flag_a or flag_b:\n"
+            "            log('flags set')\n"
+        )
+        fragment = PythonFrontend().lower(f, root=tmp_path)
+
+        assert len(fragment.agents) == 1
+        assert fragment.agents[0].has_step_bound is False
+
+
 class TestEndToEnd:
     def test_lowers_a_realistic_agent_file(self, tmp_path: Path) -> None:
         f = tmp_path / "agent.py"

@@ -19,8 +19,13 @@
 // `for(;;)` way) -- these are the SAME rule concepts (AR001/AR003/AR014), not new rules.
 import * as ts from 'typescript';
 import { createHash } from 'node:crypto';
+import * as readline from 'node:readline';
 
-const [scriptKindArg, maxAstNodesArg] = process.argv.slice(2);
+// argv[0] is either 'ts'/'js' (single-shot mode, unchanged contract) or '--serve' (server mode,
+// see runServer() below). argv[1] is maxAstNodes in both modes.
+const [modeArg, maxAstNodesArg] = process.argv.slice(2);
+const SERVE_MODE = modeArg === '--serve';
+const scriptKindArg = modeArg;
 const MAX_AST_NODES = Number(maxAstNodesArg) || 200000;
 
 function readStdin() {
@@ -137,17 +142,40 @@ const BOUND_BINARY_OPERATORS = new Set([
   ts.SyntaxKind.EqualsEqualsEqualsToken,
 ]);
 
+// Widened from an exact top-level BinaryExpression match: a compound condition such as
+// `!isContendedLockError(e) || Date.now() >= deadline` (a `||`-BinaryExpression wrapping the
+// real comparison) is just as much a visible bound as a bare `x >= MAX` -- the comparison is
+// still statically present, only nested one level deeper. Mirrors the same fix in loops.py
+// (`_test_contains_bound_comparison`) -- confirmed false positive against real HarnessKit code
+// (scripts/review-independence/run-json-atomic.js's retryOnContention) found via dogfood review.
+function testContainsBoundComparison(test) {
+  let found = false;
+  function visit(n) {
+    if (found) return;
+    if (ts.isBinaryExpression(n) && BOUND_BINARY_OPERATORS.has(n.operatorToken.kind)) {
+      found = true;
+      return;
+    }
+    n.forEachChild(visit);
+  }
+  visit(test);
+  return found;
+}
+
 function hasVisibleStepBound(bodyNode) {
   let found = false;
   function visit(n) {
     if (found) return;
     if (ts.isIfStatement(n)) {
       const test = n.expression;
-      if (ts.isBinaryExpression(test) && BOUND_BINARY_OPERATORS.has(test.operatorToken.kind)) {
+      if (testContainsBoundComparison(test)) {
         let hasExit = false;
         (function walkExit(x) {
           if (hasExit) return;
-          if (ts.isBreakStatement(x) || ts.isReturnStatement(x)) { hasExit = true; return; }
+          // `throw` (mirrors Python `raise`) is a valid loop exit alongside `break`/`return`:
+          // it propagates out of the loop exactly as those do. Same dogfood finding as above --
+          // the confirmed false positive's exit was `throw e`, not `break`/`return`.
+          if (ts.isBreakStatement(x) || ts.isReturnStatement(x) || ts.isThrowStatement(x)) { hasExit = true; return; }
           x.forEachChild(walkExit);
         })(n.thenStatement);
         if (hasExit) { found = true; return; }
@@ -362,22 +390,23 @@ function detectRetryPolicies(sourceFile) {
   return policies;
 }
 
-async function main() {
-  const source = await readStdin();
-  const scriptKind = scriptKindFor(scriptKindArg);
+// Parses one source string and returns the result object (never writes to stdout itself) --
+// shared by both single-shot mode and server mode below, so the two modes can never drift in
+// what they actually detect.
+async function parseOne(source, forScriptKindArg) {
+  const scriptKind = scriptKindFor(forScriptKindArg);
 
   let sourceFile;
   try {
     sourceFile = ts.createSourceFile(
-      'input' + (scriptKindArg === 'ts' ? '.ts' : '.js'),
+      'input' + (forScriptKindArg === 'ts' ? '.ts' : '.js'),
       source,
       ts.ScriptTarget.ES2022,
       /* setParentNodes */ true,
       scriptKind
     );
   } catch (e) {
-    process.stdout.write(JSON.stringify({ ok: false, error_kind: 'parse_error', message: String(e && e.message || e), line: null }));
-    return;
+    return { ok: false, error_kind: 'parse_error', message: String(e && e.message || e), line: null };
   }
 
   // ts.createSourceFile does not throw on most malformed input (it produces a best-effort tree
@@ -387,31 +416,81 @@ async function main() {
   if (parseDiagnostics.length > 0) {
     const first = parseDiagnostics[0];
     const pos = typeof first.start === 'number' ? sourceFile.getLineAndCharacterOfPosition(first.start) : null;
-    process.stdout.write(JSON.stringify({
+    return {
       ok: false,
       error_kind: 'parse_error',
       message: ts.flattenDiagnosticMessageText(first.messageText, '\n'),
       line: pos ? pos.line + 1 : null,
-    }));
-    return;
+    };
   }
 
   const { count, exceeded } = countNodesBounded(sourceFile, MAX_AST_NODES);
   if (exceeded) {
-    process.stdout.write(JSON.stringify({ ok: false, error_kind: 'node_limit_exceeded', message: `AST node count exceeds limit (${MAX_AST_NODES})`, line: null }));
-    return;
+    return { ok: false, error_kind: 'node_limit_exceeded', message: `AST node count exceeds limit (${MAX_AST_NODES})`, line: null };
   }
 
-  const result = {
+  return {
     ok: true,
     node_count: count,
     agents: detectAgents(sourceFile),
     tool_calls: detectToolCalls(sourceFile),
     retry_policies: detectRetryPolicies(sourceFile),
   };
+}
+
+// Single-shot mode: EXACT same contract as before this file supported server mode -- argv[0] is
+// 'ts'/'js', stdin is the raw source text, stdout gets exactly one JSON object, process exits.
+// Kept unchanged so every existing caller/test that spawns this script per file still works.
+async function runSingleShot() {
+  const source = await readStdin();
+  const result = await parseOne(source, scriptKindArg);
   process.stdout.write(JSON.stringify(result));
 }
 
-main().catch((e) => {
-  process.stdout.write(JSON.stringify({ ok: false, error_kind: 'internal_error', message: String(e && e.stack || e), line: null }));
-});
+// Server mode (additive, opt-in via argv[0] === '--serve'): amortizes Node process startup +
+// `require('typescript')` module-load cost (measured ~290ms/file in single-shot mode, dominated
+// by startup, not actual parsing) across an entire scan instead of paying it once per file --
+// this is what made a full HarnessKit-repo scan hit the whole-scan wall-clock budget from spawn
+// overhead alone (see docs/ts-js-frontend-harnesskit-dogfood.md, F6). Wire protocol: the caller
+// (ts_js_frontend.py's persistent worker) writes one newline-delimited JSON request
+// {id, script_kind, source} per file to this process's stdin and reads one newline-delimited
+// JSON response {id, ...same shape parseOne() always returned...} per line from stdout. This
+// process stays alive, reusing its already-loaded `typescript` module, until the caller closes
+// stdin (clean EOF exit) or kills it (e.g. after a per-file timeout on the Python side). Detection
+// logic is identical to single-shot mode -- parseOne() is the single source of truth for both.
+async function runServer() {
+  const rl = readline.createInterface({ input: process.stdin, crlfDelay: Infinity });
+  for await (const line of rl) {
+    if (!line.trim()) continue;
+    let request;
+    try {
+      request = JSON.parse(line);
+    } catch (e) {
+      process.stdout.write(
+        JSON.stringify({ id: null, ok: false, error_kind: 'internal_error', message: `malformed request: ${String(e && e.message || e)}`, line: null }) + '\n'
+      );
+      continue;
+    }
+    let result;
+    try {
+      result = await parseOne(request.source, request.script_kind);
+    } catch (e) {
+      result = { ok: false, error_kind: 'internal_error', message: String(e && e.stack || e), line: null };
+    }
+    result.id = request.id;
+    process.stdout.write(JSON.stringify(result) + '\n');
+  }
+}
+
+if (SERVE_MODE) {
+  runServer().catch((e) => {
+    process.stdout.write(
+      JSON.stringify({ id: null, ok: false, error_kind: 'internal_error', message: String(e && e.stack || e), line: null }) + '\n'
+    );
+    process.exitCode = 1;
+  });
+} else {
+  runSingleShot().catch((e) => {
+    process.stdout.write(JSON.stringify({ ok: false, error_kind: 'internal_error', message: String(e && e.stack || e), line: null }));
+  });
+}
