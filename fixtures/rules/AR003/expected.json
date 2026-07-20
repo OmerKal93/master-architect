@@ -1,9 +1,12 @@
 {
   "edge/unrecognized_callee_no_timeout.py": [],
+  "edge/unrecognized_callee_no_timeout.js": [],
   "safe/openai_audio_transcription_with_timeout.py": [],
   "safe/anthropic_messages_with_timeout.py": [],
   "safe/requests_post_with_timeout.py": [],
   "safe/openai_chat_completion_timeout_none_unverified.py": [],
+  "safe/axios_get_with_timeout.js": [],
+  "safe/axios_get_with_timeout.ts": [],
   "unsafe/openai_chat_completion_no_timeout.py": [
     {
       "category": "timeouts",
@@ -13,6 +16,14 @@
     }
   ],
   "unsafe/anthropic_messages_create_no_timeout.py": [
+    {
+      "category": "timeouts",
+      "confidence": "low",
+      "rule_id": "AR003",
+      "severity": "high"
+    }
+  ],
+  "unsafe/anthropic_messages_create_no_timeout.js": [
     {
       "category": "timeouts",
       "confidence": "low",
@@ -45,6 +56,30 @@
     }
   ],
   "unsafe/known_false_positive_client_level_timeout.py": [
+    {
+      "category": "timeouts",
+      "confidence": "high",
+      "rule_id": "AR003",
+      "severity": "high"
+    }
+  ],
+  "unsafe/axios_post_no_timeout.js": [
+    {
+      "category": "timeouts",
+      "confidence": "high",
+      "rule_id": "AR003",
+      "severity": "high"
+    }
+  ],
+  "unsafe/axios_post_no_timeout.ts": [
+    {
+      "category": "timeouts",
+      "confidence": "high",
+      "rule_id": "AR003",
+      "severity": "high"
+    }
+  ],
+  "unsafe/harnesskit_pattern_health_check_no_timeout.js": [
     {
       "category": "timeouts",
       "confidence": "high",

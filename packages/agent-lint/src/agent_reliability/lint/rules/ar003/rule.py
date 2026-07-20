@@ -80,21 +80,46 @@ WHY_IT_MATTERS = (
 # after a user applied that fix, directing them at a "fix" the analyzer can't verify. An earlier
 # version of this string suggested it anyway -- remediation text is part of the emitted finding
 # contract, so this was a real bug, not wording drift. Caught by independent review.
+#
+# TS/JS parity (E-ts01): language-neutral wording -- ToolCall is a language-neutral IR entity
+# (see AR001's own `_evidence_for` fix), and "timeout=" is Python-keyword-argument-specific
+# syntax that reads as wrong on a JS/TS finding (whose idiom is a `{ timeout: ... }` options
+# object, not a keyword argument). Caught by independent review of the TS/JS frontend slice.
 REMEDIATION = (
-    "Pass an explicit `timeout=` (seconds, or a library-specific timeout object) at this call "
-    "site. Configuring a timeout on the client/session instead does make the call genuinely "
-    "safe, but this rule cannot see that and will keep reporting the finding regardless -- see "
-    "docs.md's \"Known limitation\" section."
+    "Add an explicit timeout configuration at this call site (a `timeout=` keyword argument, a "
+    "`{ timeout: ... }` option, or a library-specific timeout object, depending on the "
+    "language/library). Configuring a timeout on the client/session instead does make the call "
+    "genuinely safe, but this rule cannot see that and will keep reporting the finding "
+    "regardless -- see docs.md's \"Known limitation\" section."
 )
 
 # Module-qualified HTTP client calls: the textual callee itself names the library (e.g.
 # "requests.post"), so no further disambiguation is needed. See docs.md for the exact method
 # lists and why session/instance-based calls (e.g. `session.post(...)`) are not included --
 # the frontend cannot statically know what `session` is bound to.
+#
+# TS/JS parity (E-ts01): "axios" is the JS-ecosystem sibling of requests/httpx here -- same
+# concept (a named HTTP client library's module-qualified method call), same allowlist, not a
+# new rule.
+#
+# Known, accepted consequence of sharing one language-neutral allowlist across both frontends
+# (flagged by independent review): a .py file with a local object literally named `axios`
+# calling `.post(...)`/`.get(...)`/etc with no timeout would now also match, since this rule
+# only ever sees the frontend's textual `callee` string, never which language produced it. Not
+# special-cased -- the blast radius is a Python identifier that happens to share a name with a
+# JS HTTP library, and per this rule's own "silence over guessing" philosophy elsewhere, a false
+# positive here is far less likely than a real `axios.post(...)` call going unflagged in TS/JS.
+#
+# Bare `fetch(...)` is deliberately NOT included: it is a bare-name call, not an
+# attribute-chain call, and calls.py's own module docstring already documents "only
+# attribute-chain calls are recorded" as a stated Python-frontend trade-off -- the TS/JS frontend
+# (ts_js_frontend.py / tools/ts_frontend/parse_one_file.mjs) keeps that same scope rather than
+# special-casing one bare-name callee just because it is common in JS. A documented limitation,
+# not a silent gap -- see docs.md.
 _HTTP_LIBRARY_METHOD_NAMES = ("get", "post", "put", "patch", "delete", "head", "options", "request")
 _HTTP_LIBRARY_CALLEES: frozenset[str] = frozenset(
     f"{library}.{method}"
-    for library in ("requests", "httpx")
+    for library in ("requests", "httpx", "axios")
     for method in _HTTP_LIBRARY_METHOD_NAMES
 ) | frozenset({"httpx.stream", "urllib3.request", "urllib3.urlopen"})
 
@@ -177,13 +202,17 @@ def _lacks_timeout(tool_call: ToolCall) -> bool:
 
 
 def _evidence_for(tool_call: ToolCall) -> str:
-    # explicit_none is a real keyword argument (`timeout=None`) -- "no timeout= keyword argument"
+    # explicit_none is a real, explicit null/None timeout value -- "no timeout= keyword argument"
     # would be factually wrong for that case, caught by independent review. Not reached when
     # tool_call.timeout is None (that shape reads "no timeout evidence was even looked for",
-    # a different, correct meaning of "no keyword argument").
+    # a different, correct meaning of "no timeout configuration").
+    #
+    # TS/JS parity (E-ts01): language-neutral wording, matching AR001's own evidence-text fix --
+    # "timeout=" keyword-argument phrasing is Python-specific and reads as wrong for a JS/TS
+    # finding (whose timeout idiom is a `{ timeout: ... }` object property).
     if tool_call.timeout is not None and tool_call.timeout.explicit_none:
-        return f"{tool_call.callee}(...) has `timeout=None`, which disables the timeout entirely"
-    return f"{tool_call.callee}(...) has no `timeout=` keyword argument"
+        return f"{tool_call.callee}(...) has an explicit null timeout, which disables the timeout entirely"
+    return f"{tool_call.callee}(...) has no visible timeout configuration"
 
 
 def _description_for(tool_call: ToolCall) -> str:

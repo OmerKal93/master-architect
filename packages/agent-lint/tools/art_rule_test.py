@@ -31,7 +31,13 @@ from agent_reliability.core.contracts import RuleContext
 from agent_reliability.core.model.config import default_config
 from agent_reliability.core.model.finding import Finding
 from agent_reliability.lint.frontend.python_frontend import PythonFrontend
+from agent_reliability.lint.frontend.ts_js_frontend import TsJsFrontend
 from agent_reliability.lint.rules import ALL_RULES
+
+# Frontend selection mirrors scan.py's own `next(fe for fe in frontends if fe.supports(path))`
+# pattern -- the fixture harness must exercise the SAME frontend a real scan would pick for a
+# given fixture file's extension, not just PythonFrontend, now that TS/JS fixtures exist too.
+_FIXTURE_FRONTENDS = (PythonFrontend(), TsJsFrontend())
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 FIXTURES_RULES_ROOT = REPO_ROOT / "fixtures" / "rules"
@@ -100,7 +106,9 @@ def _project_finding(finding: Finding) -> dict[str, str]:
 
 def _findings_for_file(fixture_file: Path, *, root: Path) -> list[dict[str, str]]:
     """Lower ``fixture_file`` and run every registered rule against it (the cross-rule net)."""
-    frontend = PythonFrontend()
+    frontend = next((fe for fe in _FIXTURE_FRONTENDS if fe.supports(fixture_file)), None)
+    if frontend is None:
+        raise ValueError(f"no frontend supports fixture file: {fixture_file}")
     fragment = frontend.lower(fixture_file, root=root)
     ctx = RuleContext(_fragment=fragment, _config=default_config())
 

@@ -61,11 +61,16 @@ def test_named_agent_evidence_mentions_recursion() -> None:
     assert "calls itself" in finding.evidence
 
 
-def test_anonymous_agent_evidence_mentions_while_true() -> None:
+def test_anonymous_agent_evidence_mentions_unconditional_loop() -> None:
+    # TS/JS parity fix (E-ts01): evidence text used to assert the literal Python spelling
+    # "while True", which is factually wrong for a JS/TS-sourced Agent (Agent is a
+    # language-neutral IR entity -- an unconditional loop can equally be `while (true)`,
+    # `while (1)`, or `for (;;)`). Found during real dogfooding of the new TS/JS frontend
+    # against HarnessKit's own JS code. Now asserts the language-neutral wording instead.
     fragment = IRFragment(file="a.py", agents=(_agent(has_step_bound=False, structural_hash="h"),))
     ctx = RuleContext(_fragment=fragment, _config=default_config())
     finding = next(iter(RULE.evaluate(ctx)))
-    assert "while True" in finding.evidence
+    assert "unconditional loop" in finding.evidence
 
 
 def test_two_structurally_identical_agents_get_distinct_fingerprints() -> None:

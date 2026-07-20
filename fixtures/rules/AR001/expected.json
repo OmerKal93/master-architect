@@ -1,8 +1,14 @@
 {
   "edge/while_true_no_calls.py": [],
+  "edge/while_true_no_calls.js": [],
   "safe/finite_for_loop.py": [],
+  "safe/finite_for_loop.js": [],
   "safe/recursive_with_bound.py": [],
+  "safe/recursive_with_bound.js": [],
   "safe/while_true_with_bound.py": [],
+  "safe/while_true_with_bound.js": [],
+  "safe/while_true_with_bound.ts": [],
+  "safe/harnesskit_pattern_dispatch_poll_with_deadline.js": [],
   "unsafe/recursive_no_bound.py": [
     {
       "category": "loop-safety",
@@ -11,7 +17,47 @@
       "severity": "high"
     }
   ],
+  "unsafe/recursive_no_bound.js": [
+    {
+      "category": "loop-safety",
+      "confidence": "high",
+      "rule_id": "AR001",
+      "severity": "high"
+    }
+  ],
   "unsafe/while_true_no_bound.py": [
+    {
+      "category": "loop-safety",
+      "confidence": "high",
+      "rule_id": "AR001",
+      "severity": "high"
+    }
+  ],
+  "unsafe/while_true_no_bound.js": [
+    {
+      "category": "loop-safety",
+      "confidence": "high",
+      "rule_id": "AR001",
+      "severity": "high"
+    }
+  ],
+  "unsafe/while_true_no_bound.ts": [
+    {
+      "category": "loop-safety",
+      "confidence": "high",
+      "rule_id": "AR001",
+      "severity": "high"
+    }
+  ],
+  "unsafe/infinite_for_no_bound.js": [
+    {
+      "category": "loop-safety",
+      "confidence": "high",
+      "rule_id": "AR001",
+      "severity": "high"
+    }
+  ],
+  "unsafe/harnesskit_pattern_dispatch_poll_no_bound.js": [
     {
       "category": "loop-safety",
       "confidence": "high",

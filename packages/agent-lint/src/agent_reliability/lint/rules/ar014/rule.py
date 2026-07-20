@@ -53,10 +53,26 @@ WHY_IT_MATTERS = (
     "as a failure anywhere."
 )
 
-REMEDIATION = (
-    "Add an explicit, finite upper bound: `stop=stop_after_attempt(N)` for tenacity, a literal "
-    "`attempts=N` for stamina, or a counted loop (`for _ in range(N):`) for a manual retry loop."
+_MANUAL_LOOP_REMEDIATION = (
+    "Add an explicit, finite upper bound: a counted loop with a literal maximum "
+    "(`for _ in range(N):` in Python, `for (let i = 0; i < N; i++)` in JS/TS)."
 )
+_LIBRARY_REMEDIATION = (
+    "Add an explicit, finite upper bound: `stop=stop_after_attempt(N)` for tenacity, a literal "
+    "`attempts=N` for stamina."
+)
+
+
+def _remediation_for(retry_policy: RetryPolicy) -> str:
+    # TS/JS parity (E-ts01): tenacity/stamina are real, verified Python-only libraries (this
+    # rule never claims JS support for them -- see module docstring), so their remediation stays
+    # library-specific. "manual-loop" is the one source shared across languages (Python and
+    # JS/TS both produce it -- see retries.py and parse_one_file.mjs), so its remediation must be
+    # language-neutral rather than defaulting to Python's `range(N)` syntax on a JS finding.
+    # Caught by independent review of the TS/JS frontend slice.
+    if retry_policy.source == "manual-loop":
+        return _MANUAL_LOOP_REMEDIATION
+    return _LIBRARY_REMEDIATION
 
 
 def _evidence_for(retry_policy: RetryPolicy) -> str:
@@ -105,7 +121,7 @@ class AR014Rule:
                 span=retry_policy.span,
                 evidence=_evidence_for(retry_policy),
                 why_it_matters=WHY_IT_MATTERS,
-                remediation=REMEDIATION,
+                remediation=_remediation_for(retry_policy),
                 fingerprint=fingerprint,
                 finding_id=derive_finding_id(fingerprint),
             )

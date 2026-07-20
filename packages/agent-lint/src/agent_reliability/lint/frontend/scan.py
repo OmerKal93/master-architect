@@ -24,6 +24,7 @@ from agent_reliability.lint.frontend.limits import (
     ScanLimits,
 )
 from agent_reliability.lint.frontend.python_frontend import PythonFrontend
+from agent_reliability.lint.frontend.ts_js_frontend import TsJsFrontend
 
 SCAN_LEVEL_FILE = ""
 """The ``IRFragment.file`` sentinel used for diagnostics not tied to any single scanned file."""
@@ -44,7 +45,9 @@ def scan_repository(
     """
     effective_config = config if config is not None else default_config()
     effective_frontends: Sequence[Frontend] = (
-        frontends if frontends is not None else [PythonFrontend(limits=limits)]
+        frontends
+        if frontends is not None
+        else [PythonFrontend(limits=limits), TsJsFrontend(limits=limits)]
     )
 
     scan_level_diagnostics: list[Diagnostic] = []

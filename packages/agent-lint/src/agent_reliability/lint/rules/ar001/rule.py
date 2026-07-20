@@ -53,9 +53,14 @@ REMEDIATION = (
 
 
 def _evidence_for(agent: Agent) -> str:
+    # TS/JS parity fix (E-ts01): this text used to hardcode Python's `def` keyword
+    # (f"def {agent.name}(...): ...") and the literal Python spelling `while True:` --
+    # factually wrong when the underlying Agent came from a JS/TS file (whose source never says
+    # `def`), found during real dogfooding of this frontend against HarnessKit's own JS code.
+    # Language-neutral phrasing now, since Agent itself is a language-neutral IR entity.
     if agent.name:
-        return f"def {agent.name}(...): ... calls itself with no visible depth/counter guard"
-    return "while True: ... (no counter check + break/return found in the loop body)"
+        return f"{agent.name}(...) calls itself with no visible depth/counter guard"
+    return "unconditional loop (no counter check + break/return found in the loop body)"
 
 
 def _description_for(agent: Agent) -> str:

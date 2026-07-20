@@ -14,6 +14,9 @@ venv/
 # uv
 .uv/
 
+# Node (tools/ts_frontend's real TypeScript compiler dependency)
+node_modules/
+
 # Test / coverage
 .pytest_cache/
 .mypy_cache/

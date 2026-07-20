@@ -1,0 +1,10 @@
+{
+  "name": "@agent-reliability/ts-ast-frontend",
+  "private": true,
+  "version": "0.0.1",
+  "description": "Real, non-executing TypeScript/JavaScript AST parsing helper for agent-lint's TS/JS frontend. Parses only (ts.createSourceFile never runs the parsed code) -- called as a subprocess per file by src/agent_reliability/lint/frontend/ts_js_frontend.py. Not published.",
+  "type": "module",
+  "dependencies": {
+    "typescript": "5.7.3"
+  }
+}
